@@ -22,6 +22,7 @@ instance/
 .coverage
 htmlcov/
 .mypy_cache/
+backend/uploads/
 
 # Node / React (spatial-translate/)
 spatial-translate/node_modules/

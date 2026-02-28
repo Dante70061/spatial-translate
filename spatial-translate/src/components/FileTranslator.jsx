@@ -1,14 +1,12 @@
-// components/FileUploader.jsx
+// components/FileTranslator.jsx
 import React, { useState } from "react"
 
-export default function FileUploader() {
+export default function FileTranslator() {
   const [file, setFile] = useState(null)
   const [language, setLanguage] = useState("Spanish")
   const [result, setResult] = useState("")
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0])
-  }
+  const handleFileChange = (e) => setFile(e.target.files[0])
 
   const handleSubmit = async () => {
     if (!file) return
@@ -22,7 +20,6 @@ export default function FileUploader() {
         method: "POST",
         body: formData,
       })
-
       const data = await response.json()
       setResult(data.translated_text || data.error)
     } catch (err) {
@@ -36,8 +33,6 @@ export default function FileUploader() {
 
       {/* File input */}
       <input type="file" onChange={handleFileChange} />
-
-      {/* Language selector */}
       <select
         value={language}
         onChange={(e) => setLanguage(e.target.value)}

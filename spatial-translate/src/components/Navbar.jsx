@@ -1,3 +1,4 @@
+// components/Navbar.jsx
 import React, { useState } from "react"
 import "./Navbar.css"
 
@@ -7,16 +8,15 @@ export default function Navbar({ onStart, onStop }) {
 
   const handleToggle = () => {
     if (isRunning) {
-      onStop && onStop()
+      onStop && onStop() // stop speech recognition
     } else {
-      onStart && onStart(language)
+      onStart && onStart() // start speech recognition
     }
     setIsRunning(!isRunning)
   }
 
   return (
     <nav className="navbar">
-      
       {/* Left - Logo */}
       <div className="navbar-left">
         <h2 className="logo">SpatialTranslate</h2>
@@ -24,7 +24,6 @@ export default function Navbar({ onStart, onStop }) {
 
       {/* Right - Controls */}
       <div className="navbar-right">
-
         {/* Language Selector */}
         <select
           value={language}
@@ -47,13 +46,8 @@ export default function Navbar({ onStart, onStop }) {
         </button>
 
         {/* Profile */}
-        <div className="profile-circle">
-          D
-        </div>
-
+        <div className="profile-circle">D</div>
       </div>
-
     </nav>
   )
 }
-

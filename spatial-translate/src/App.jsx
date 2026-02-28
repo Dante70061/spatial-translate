@@ -1,26 +1,35 @@
 import React from "react"
+import { Routes, Route } from "react-router-dom"
 import Navbar from "./components/Navbar"
-import { BrowserRouter, Router, Routes } from "react-router-dom"
+import Subtitles from "./components/Subtitles"
 
 function App() {
-
-  const handleStart = (language) => {
-    console.log("Starting translation to:", language)
-    // Connect WebSocket here
-  }
-
-  const handleStop = () => {
-    console.log("Stopping translation")
-    // Close WebSocket here
-  }
-
   return (
-    <>
-      <Navbar onStart={handleStart} onStop={handleStop} />
-      <div style={{ marginTop: "100px" }}>
-        {/* Your spatial app content here */}
-      </div>
-    </>
+    <Routes>
+      {/* Main page */}
+      <Route
+        path="/"
+        element={
+          <>
+            <Navbar />
+            <div style={{ marginTop: "100px", textAlign: "center" }}>
+              <h1>Main Page</h1>
+            </div>
+          </>
+        }
+      />
+
+      {/* Translate page */}
+      <Route
+        path="/translate"
+        element={
+          <>
+            <Navbar />
+            <Subtitles />
+          </>
+        }
+      />
+    </Routes>
   )
 }
 

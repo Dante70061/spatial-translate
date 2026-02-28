@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <button id="startBtn">Start</button>
+  <button id="stopBtn">Stop</button>
+  <p id="status">Not listening</p>
+  <p id="output">Transcript will appear here...</p>
+
+  <script>
+    // Same logic as the hook, just without React
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let finalTranscript = '';
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += text + ' ';
+        } else {
+          interim += text;
+        }
+      }
+      // This is equivalent to setTranscript() in the hook
+      document.getElementById('output').innerText = finalTranscript + interim;
+    };
+
+    recognition.onstart = () => {
+      document.getElementById('status').innerText = 'Listening...';
+    };
+
+    recognition.onend = () => {
+      document.getElementById('status').innerText = 'Not listening';
+    };
+
+    recognition.onerror = (e) => console.error(e.error);
+
+    document.getElementById('startBtn').onclick = () => recognition.start();
+    document.getElementById('stopBtn').onclick = () => recognition.stop();
+  </script>
+</body>
+</html>

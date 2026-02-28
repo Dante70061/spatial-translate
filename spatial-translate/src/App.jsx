@@ -2,6 +2,7 @@ import React from "react"
 import { Routes, Route } from "react-router-dom"
 import Navbar from "./components/Navbar"
 import Subtitles from "./components/Subtitles"
+import FileTranslator from "./components/FileTranslator"
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
             <div style={{ marginTop: "100px", textAlign: "center" }}>
               <h1>Main Page</h1>
             </div>
+            <FileTranslator />
           </>
         }
       />

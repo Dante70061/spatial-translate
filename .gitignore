@@ -1,0 +1,56 @@
+# IntelliJ / JetBrains
+.idea/
+*.iml
+out/
+gen/
+cmake-build-*/
+*.iws
+
+# Python / Flask
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+.flaskenv
+*.log
+instance/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Node / React (spatial-translate/)
+spatial-translate/node_modules/
+spatial-translate/dist/
+spatial-translate/dist-ssr/
+spatial-translate/*.local
+spatial-translate/npm-debug.log*
+spatial-translate/yarn-debug.log*
+spatial-translate/yarn-error.log*
+
+# Global logs and OS files
+*.log
+.DS_Store
+Thumbs.db
+
+# Spatial / Data (General large files)
+*.zip
+*.tar.gz
+*.sqlite
+*.db
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qpj
+*.geojson
+*.json.gz
+*.mvt
+*.pbf
+!*.keep

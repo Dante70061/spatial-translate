@@ -25,6 +25,7 @@ htmlcov/
 backend/uploads/
 
 # Node / React (spatial-translate/)
+node_modules/
 spatial-translate/node_modules/
 spatial-translate/dist/
 spatial-translate/dist-ssr/

@@ -56,3 +56,4 @@ export default function Navbar({ onStart, onStop }) {
     </nav>
   )
 }
+

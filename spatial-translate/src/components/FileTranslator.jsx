@@ -16,7 +16,7 @@ export default function FileTranslator() {
     formData.append("language", language)
 
     try {
-      const response = await fetch("http://localhost:5001/api/translate/translate-file", {
+      const response = await fetch("https://spatial-translate-11.onrender.com/api/audio/translate-file", {
         method: "POST",
         body: formData,
       })

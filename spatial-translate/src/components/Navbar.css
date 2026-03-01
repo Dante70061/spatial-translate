@@ -9,8 +9,31 @@ html.is-spatial .navbar { background: transparent; backdrop-filter: none !import
 .navbar.active { transform: translateY(15px); background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); }
 html.is-spatial .navbar.active { transform: translateY(20px); }
 
-.navbar-inner { width: 100%; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
-.logo { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em; background: linear-gradient(180deg, #fff 0%, #4DA6FF 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.navbar-inner 
+{ 
+  width: 100%; 
+  padding: 0 24px; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+}
+.logo { 
+  font-weight: 700; 
+  font-size: 1.1rem; 
+  letter-spacing: -0.02em; 
+  background: linear-gradient(180deg, #fff 0%, #4DA6FF 100%); 
+
+  /* Standard property */
+  background-clip: text;
+
+  /* WebKit support (Chrome, Safari) */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  /* Fallback */
+  color: transparent;
+}
+
 .navbar-right { display: flex; align-items: center; gap: 12px; }
 
 .language-select { padding: 8px 14px; border-radius: 12px; border: 0.5px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.12); color: white; outline: none; cursor: pointer; font-size: 0.9rem; }

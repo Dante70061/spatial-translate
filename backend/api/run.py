@@ -3,6 +3,7 @@ eventlet.monkey_patch()
 
 import os
 import sys
+from flask_cors import CORS
 
 # Ensure the directory containing this script is in the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -11,6 +12,7 @@ from app import create_app, socketio
 
 app = create_app()
 
+CORS(app)
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, port=5001, host='0.0.0.0')

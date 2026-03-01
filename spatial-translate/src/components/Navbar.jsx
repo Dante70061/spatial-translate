@@ -20,11 +20,12 @@ export default function Navbar({ onReset, isListening }) {
             onChange={(e) => setLanguage(e.target.value)}
             className="language-select"
           >
-            <option>Spanish</option>
-            <option>French</option>
-            <option>German</option>
-            <option>Japanese</option>
-            <option>Chinese</option>
+              <option>English</option>
+              <option>Spanish</option>
+              <option>French</option>
+              <option>German</option>
+              <option>Japanese</option>
+              <option>Chinese</option>
           </select>
 
           <Link to="/translate" className="liquid-glass-button translate">

@@ -52,7 +52,7 @@ def translate_file():
 
         # Send extracted text to Gemini
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=f"Translate the following text to {target_language}:\n\n{text_content}"
         )
 

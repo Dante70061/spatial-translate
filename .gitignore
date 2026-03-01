@@ -55,3 +55,7 @@ Thumbs.db
 *.mvt
 *.pbf
 !*.keep
+
+# Agents
+GEMINI.md
+webspatial-docs.txt

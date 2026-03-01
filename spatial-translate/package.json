@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:xr": "XR_ENV=1 vite build --outDir dist-xr",
-    "xr": "webspatial-builder",
+    "preview:xr": "vite preview --outDir dist-xr",
     "lint": "eslint .",
     "preview": "vite preview"
   },

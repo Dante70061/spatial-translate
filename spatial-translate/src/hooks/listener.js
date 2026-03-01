@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:5001');
+const socket = io('https://spatial-translate-11.onrender.com/api/audio/');
 
 export function useSpeechRecognition() {
   const [history, setHistory] = useState([]);

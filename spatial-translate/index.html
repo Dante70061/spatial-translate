@@ -1,9 +1,5 @@
 <!doctype html>
-<%- XR_ENV === 'avp' ? `
-<html lang="en" class="is-spatial">
-` : `
-<html lang="en">
-` %>
+<%- (typeof XR_ENV !== 'undefined' && XR_ENV) ? '<html lang="en" class="is-spatial">' : '<html lang="en">' %>
   <head>
     <meta charset="UTF-8" />
     <link rel="manifest" href="/manifest.webmanifest" />

@@ -2,14 +2,13 @@ import React, { useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import "./Navbar.css"
 
-export default function Navbar({ onReset, isListening }) {
-  const [language, setLanguage] = useState("English")
+export default function Navbar({ onReset, isListening, language, setLanguage }) {
   const location = useLocation()
   const navigate = useNavigate()
 
   return (
     /* The 'active' class now handles the subtle downward slide instead of 'hidden' */
-    <nav className={`navbar ${isListening ? 'active' : ''}`} enable-xr="true">
+    <nav className={`navbar ${isListening ? 'active' : ''}`} enable-xr>
       <div className="navbar-inner">
         <div className="navbar-left">
           <h2 className="logo">SpatialTranscribe</h2>
@@ -18,7 +17,9 @@ export default function Navbar({ onReset, isListening }) {
         <div className="navbar-right">
           <select
             value={language}
-            onChange={(e) => setLanguage(e.target.value)}
+            onChange={(e) => {
+              if (setLanguage) setLanguage(e.target.value);
+            }}
             className="language-select"
           >
               <option>English</option>
@@ -27,6 +28,7 @@ export default function Navbar({ onReset, isListening }) {
               <option>German</option>
               <option>Japanese</option>
               <option>Chinese</option>
+              <option>Debug Mode</option>
           </select>
 
           <Link to="/translate" className="liquid-glass-button translate">

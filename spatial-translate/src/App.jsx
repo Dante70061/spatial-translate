@@ -3,10 +3,18 @@ import { Routes, Route, useLocation } from "react-router-dom"
 import Navbar from "./components/Navbar"
 import FileTranslator from "./components/FileTranslator"
 import SpeakerCaption from "./components/SpeakerCaption"
-import { useSpeechRecognition } from "./hooks/listener"
+import { useSpeechRecognition } from "./hooks/listener.jsx"
 import { initScene } from "@webspatial/react-sdk"
 
 function App() {
+  const [appLanguage, setAppLanguage] = useState("English");
+  
+  // Expose to window for the hook to pick up
+  useEffect(() => {
+    window.appLanguage = appLanguage;
+    window.setAppLanguage = setAppLanguage;
+  }, [appLanguage]);
+
   const { history, interimText, isListening, audioLevels, start, stop } = useSpeechRecognition()
   const [isStarting, setIsStarting] = useState(false)
   const openedSpeakers = useRef(new Set())
@@ -84,8 +92,15 @@ function App() {
   }, [isSpeakerRoute])
 
   return (
-    <div className="app-root">
-      {!isSpeakerRoute && <Navbar onReset={stop} isListening={isListening} />}
+    <div className="app-root" enable-xr-monitor>
+      {!isSpeakerRoute && (
+        <Navbar 
+          onReset={stop} 
+          isListening={isListening} 
+          language={appLanguage}
+          setLanguage={setAppLanguage}
+        />
+      )}
 
       <Routes>
         <Route path="/speaker/:speakerName" element={<SpeakerCaption />} />
@@ -94,7 +109,7 @@ function App() {
         <Route
           path="*"
           element={
-            <div className={`content-scene ${isListening && location.pathname === '/' ? 'state-active' : ''}`} enable-xr="true">
+            <div className={`content-scene ${isListening && location.pathname === '/' ? 'state-active' : ''}`} enable-xr>
               
               <div className="scene-view-layer" style={{
                 opacity: location.pathname === '/' && !isListening ? 1 : 0,

@@ -107,29 +107,37 @@ html.is-spatial .speaker-caption-container {
   font-weight: 600; 
   letter-spacing: -0.015em;
   min-height: 140px; 
-  display: flex; 
-  flex-direction: column; 
-  justify-content: flex-start; 
+  display: block; 
   color: #ffffff;
   -webkit-font-smoothing: antialiased;
   text-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .final-text { 
-  margin: 8px 0; 
+  display: inline;
   color: rgba(255, 255, 255, 0.96); 
-  animation: textFloat 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); 
+  animation: textFloat 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transition: opacity 0.8s ease, filter 0.8s ease;
+  will-change: opacity, transform, filter;
 }
 
 .interim-text { 
-  margin: 8px 0; 
+  display: inline;
   color: rgba(255, 255, 255, 0.45); 
   font-style: normal; 
   filter: blur(0.4px);
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: color, filter;
 }
 
 @keyframes textFloat {
-  0% { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+  0% { opacity: 0; transform: translateY(4px); filter: blur(2px); }
   100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+/* Subtle exit animation for when React removes the element */
+.final-text.exiting {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateY(-4px);
 }

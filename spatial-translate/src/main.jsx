@@ -9,11 +9,16 @@ initPolyfill()
 
 /* global __XR_ENV_BASE__ */
 const getBasename = () => {
-  if (typeof __XR_ENV_BASE__ === 'undefined') return "";
-  // Only use the basename if the current URL actually starts with it.
-  // This prevents React Router from failing to render when at the root path.
-  if (window.location.pathname.startsWith(__XR_ENV_BASE__)) {
-    return __XR_ENV_BASE__;
+  /* global __XR_ENV_BASE__ */
+  if (typeof __XR_ENV_BASE__ === 'undefined' || !__XR_ENV_BASE__) return "";
+  
+  // Normalize base by removing trailing slash if present
+  const base = __XR_ENV_BASE__.endsWith('/') ? __XR_ENV_BASE__.slice(0, -1) : __XR_ENV_BASE__;
+  
+  // Check if current path starts with normalized base
+  if (window.location.pathname.startsWith(base)) {
+    console.log("[ROUTER] Using basename:", base);
+    return base;
   }
   return "";
 };

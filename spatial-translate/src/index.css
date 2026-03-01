@@ -9,13 +9,14 @@
 }
 
 body, html {
-  margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000;
+  margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: transparent;
 }
 
 #root, .app-root {
   width: 100%; height: 100%; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important;
 }
 
+/* Base styles for spatial mode */
 html.is-spatial, html.is-spatial body {
   background: transparent !important; background-color: transparent !important; --xr-background-material: transparent;
 }

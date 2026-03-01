@@ -1,10 +1,11 @@
 import React, { useState } from "react"
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import "./Navbar.css"
 
 export default function Navbar({ onReset, isListening }) {
-  const [language, setLanguage] = useState("Spanish")
+  const [language, setLanguage] = useState("English")
   const location = useLocation()
+  const navigate = useNavigate()
 
   return (
     /* The 'active' class now handles the subtle downward slide instead of 'hidden' */
@@ -32,13 +33,27 @@ export default function Navbar({ onReset, isListening }) {
             PDF Translate
           </Link>
 
-          <Link 
-            to="/" 
-            className="liquid-glass-button translate"
-            onClick={() => onReset && onReset()}
-          >
-            Live Captions
-          </Link>
+          {isListening ? (
+            <button 
+              className="liquid-glass-button translate"
+              onClick={() => {
+                if (onReset) onReset();
+                if (location.pathname !== "/") {
+                  navigate("/");
+                }
+              }}
+              style={{ background: 'rgba(255, 100, 100, 0.2)' }}
+            >
+              End Session
+            </button>
+          ) : (
+            <Link 
+              to="/" 
+              className="liquid-glass-button translate"
+            >
+              Live Captions
+            </Link>
+          )}
         </div>
       </div>
     </nav>

@@ -17,7 +17,6 @@ export function useSpeechRecognition() {
   const historyRef = useRef([]);
   const [interimText, setInterimText] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [currentAngle, setCurrentAngle] = useState(0);
   const [audioLevels, setAudioLevels] = useState({ left: 0, right: 0 });
   const audioLevelsRef = useRef({ left: 0, right: 0 });
   
@@ -33,8 +32,13 @@ export function useSpeechRecognition() {
   const sentenceStartTime = useRef(null);
   const pauseTimer = useRef(null);
 
+  // Current angle tracker
+  const currentAngleRef = useRef(0);
+
   useEffect(() => {
-    const handleDirectionUpdate = (data) => setCurrentAngle(data.angle);
+    const handleDirectionUpdate = (data) => {
+      currentAngleRef.current = data.angle;
+    };
     socket.on('direction_update', handleDirectionUpdate);
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -51,9 +55,13 @@ export function useSpeechRecognition() {
       if (!text.trim() || isCommitting.current) return;
       isCommitting.current = true;
 
-      console.log(`[COMMIT] ${speaker}: ${text}`);
+      console.log(`[COMMIT] ${speaker}: ${text} at angle ${currentAngleRef.current}`);
       
-      const newItem = { text, angle: audioLevelsRef.current.left > audioLevelsRef.current.right ? -10 : 10, speaker };
+      const newItem = { 
+        text, 
+        angle: currentAngleRef.current, 
+        speaker 
+      };
       
       setHistory(prev => {
         const updated = [...prev, newItem];
@@ -61,7 +69,7 @@ export function useSpeechRecognition() {
         return updated;
       });
 
-      channel.postMessage({ type: 'CAPTION', speaker, text, isFinal: true });
+      channel.postMessage({ type: 'CAPTION', speaker, text, angle: currentAngleRef.current, isFinal: true });
       
       // Reset state for next sentence
       setInterimText('');
@@ -110,12 +118,10 @@ export function useSpeechRecognition() {
       if (interim.trim()) {
         if (!sentenceStartTime.current) sentenceStartTime.current = Date.now();
         
-        // Persistence Check: Don't let interim text shrink dramatically unless it's a new sentence
-        // This prevents the flickering deletions you were seeing.
         if (interim.length >= currentInterimRef.current.length || interim.length > (currentInterimRef.current.length * 0.7)) {
           setInterimText(interim);
           currentInterimRef.current = interim;
-          channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: interim, isFinal: false });
+          channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: interim, angle: currentAngleRef.current, isFinal: false });
         }
 
         // A. Max Length Watchdog (5s)

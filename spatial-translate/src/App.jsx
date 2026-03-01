@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useRef, useState, useCallback } from "react"
 import { Routes, Route, useLocation } from "react-router-dom"
 import Navbar from "./components/Navbar"
 import FileTranslator from "./components/FileTranslator"
@@ -8,143 +8,126 @@ import { initScene } from "@webspatial/react-sdk"
 
 function App() {
   const { history, interimText, isListening, audioLevels, start, stop } = useSpeechRecognition()
-  const [isStarting, setIsStarting] = useState(false);
-  const openedSpeakers = useRef(new Set());
-  const activeWindowsRef = useRef(new Set());
-  const location = useLocation();
-  const isSpeakerRoute = location.pathname.includes('/speaker/');
+  const [isStarting, setIsStarting] = useState(false)
+  const openedSpeakers = useRef(new Set())
+  const activeWindowsRef = useRef(new Set())
+  const location = useLocation()
+  
+  const isSpeakerRoute = location.pathname.includes('/speaker/')
 
-  // Watchdog to see if bubbles are still open
   useEffect(() => {
-    const channel = new BroadcastChannel('captions_channel');
-    
-    channel.onmessage = (e) => {
+    const channel = new BroadcastChannel('captions_channel')
+    const handleMessage = (e) => {
       if (e.data.type === 'WINDOW_STATUS') {
         if (e.data.status === 'open') {
-          activeWindowsRef.current.add(e.data.speaker);
-          setIsStarting(false);
+          activeWindowsRef.current.add(e.data.speaker)
+          setIsStarting(false)
         } else if (e.data.status === 'closed') {
-          activeWindowsRef.current.delete(e.data.speaker);
+          activeWindowsRef.current.delete(e.data.speaker)
           if (activeWindowsRef.current.size === 0 && isListening && !isStarting) {
-            stop();
+            stop()
           }
         }
+      } else if (e.data.type === 'SYNC_REQUEST') {
+        channel.postMessage({ type: 'SYNC_RESPONSE', history })
       }
-    };
-
-    const checkInterval = setInterval(() => {
-      if (isListening && !isStarting && activeWindowsRef.current.size > 0) {
-        activeWindowsRef.current.clear();
-        channel.postMessage({ type: 'PING' });
-        setTimeout(() => {
-          if (activeWindowsRef.current.size === 0 && isListening && !isStarting) {
-            stop();
-          }
-        }, 1500);
-      }
-    }, 4000);
-
+    }
+    channel.addEventListener('message', handleMessage)
     return () => {
-      clearInterval(checkInterval);
-      channel.close();
-    };
-  }, [isListening, stop, isStarting]);
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
+  }, [isListening, stop, isStarting, history])
 
   const handleStart = () => {
-    setIsStarting(true);
-    start();
-  };
+    openedSpeakers.current.clear()
+    setIsStarting(true)
+    start()
+  }
 
-  useEffect(() => {
-    if (isSpeakerRoute) {
-      document.documentElement.classList.add('is-speaker-page');
-    } else {
-      document.documentElement.classList.remove('is-speaker-page');
-    }
-  }, [isSpeakerRoute]);
-
-  useEffect(() => {
-    if (!isListening) {
-      openedSpeakers.current.clear();
-    }
-  }, [isListening]);
-
-  useEffect(() => {
-    if (!isListening || isSpeakerRoute) return;
-
-    history.forEach(item => {
-      if (!openedSpeakers.current.has(item.speaker)) {
-        openSpeakerWindow(item.speaker);
-      }
-    });
-
-    if (interimText.trim()) {
-      const isLeft = audioLevels.left > audioLevels.right;
-      const currentSpeaker = isLeft ? 'Person A' : 'Person B';
-      if (!openedSpeakers.current.has(currentSpeaker)) {
-        openSpeakerWindow(currentSpeaker);
-      }
-    }
-  }, [history, interimText, isListening, isSpeakerRoute, audioLevels]);
-
-  const openSpeakerWindow = (speakerName) => {
-    openedSpeakers.current.add(speakerName);
-    const sceneName = `speaker_${speakerName.replace(/\s+/g, '_')}`;
+  const openSpeakerWindow = useCallback((speakerName) => {
+    if (openedSpeakers.current.has(speakerName)) return
+    openedSpeakers.current.add(speakerName)
     
-    // Compact window (3/4 height of previous large window)
+    const sceneName = `speaker_${speakerName.replace(/\s+/g, '_')}`
+    
+    /* global __XR_ENV_BASE__ */
+    let baseUrl = typeof __XR_ENV_BASE__ !== 'undefined' ? __XR_ENV_BASE__ : ''
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1)
+    
+    const url = `${baseUrl}/speaker/${encodeURIComponent(speakerName)}`
+    
     if (typeof initScene === 'function') {
       initScene(sceneName, (prev) => ({
         ...prev,
-        defaultSize: { width: 850, height: 600 }
-      }));
+        defaultSize: { width: 1600, height: 600 },
+        worldAlignment: 'adaptive'
+      }))
     }
 
-    /* global __XR_ENV_BASE__ */
-    let baseUrl = typeof __XR_ENV_BASE__ !== 'undefined' ? __XR_ENV_BASE__ : '';
-    if (baseUrl.endsWith('/')) {
-      baseUrl = baseUrl.slice(0, -1);
+    window.open(url, sceneName)
+  }, [])
+
+  useEffect(() => {
+    if (!isListening || isSpeakerRoute) return
+    history.forEach(item => openSpeakerWindow(item.speaker))
+    if (interimText.trim()) {
+      const isLeft = audioLevels.left > audioLevels.right
+      const currentSpeaker = isLeft ? 'Person A' : 'Person B'
+      openSpeakerWindow(currentSpeaker)
     }
-    window.open(`${baseUrl}/speaker/${encodeURIComponent(speakerName)}`, sceneName);
-  };
+  }, [history, interimText, isListening, isSpeakerRoute, audioLevels, openSpeakerWindow])
+
+  useEffect(() => {
+    if (isSpeakerRoute) document.documentElement.classList.add('is-speaker-page')
+    else document.documentElement.classList.remove('is-speaker-page')
+  }, [isSpeakerRoute])
 
   return (
-    <>
+    <div className="app-root">
       {!isSpeakerRoute && <Navbar onReset={stop} isListening={isListening} />}
 
       <Routes>
         <Route path="/speaker/:speakerName" element={<SpeakerCaption />} />
+        
+        {/* The Global Glass Container */}
         <Route
-          path="/"
+          path="*"
           element={
-            <div className={`home-page ${isListening ? 'collapsed' : ''}`} enable-xr="true">
-              {!isListening && (
-                <div className="home-content">
-                  <div style={{ textAlign: "center", marginBottom: "60px" }}>
-                    <h1>Vision Pro Auto-Caption</h1>
-                    <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "1.2rem" }}>
-                      Experience spatial, person-anchored captions.
-                    </p>
-                  </div>
-
-                  {/* The Centralized Hero Interaction */}
-                  <button 
-                    className="liquid-glass-button hero-start" 
-                    onClick={handleStart}
-                    style={{ width: '280px', height: '60px', borderRadius: '30px', fontSize: '1.1rem' }}
-                  >
-                    Start Spatial Captions
-                  </button>
-                  <div style={{ marginTop: "60px", color: "white", textAlign: "center", opacity: 0.4 }}>
+            <div className={`content-scene ${isListening && location.pathname === '/' ? 'state-active' : ''}`} enable-xr="true">
+              
+              <div className="scene-view-layer" style={{
+                opacity: location.pathname === '/' && !isListening ? 1 : 0,
+                visibility: location.pathname === '/' && !isListening ? 'visible' : 'hidden'
+              }}>
+                <div className="home-content-container">
+                  <header className="hero-header">
+                    <h1 className="hero-title">Vision Pro Auto-Caption</h1>
+                    <p className="hero-subtitle">Experience spatial, person-anchored captions.</p>
+                  </header>
+                  <main className="hero-actions">
+                    <button className="liquid-glass-button hero-start" onClick={handleStart}>
+                      Start Spatial Captions
+                    </button>
+                  </main>
+                  <footer className="hero-footer">
                     <p>Speak to spawn anchored bubbles in your space.</p>
-                  </div>
+                  </footer>
                 </div>
-              )}
+              </div>
+
+              <div className="scene-view-layer" style={{
+                opacity: location.pathname === '/translate' ? 1 : 0,
+                visibility: location.pathname === '/translate' ? 'visible' : 'hidden'
+              }}>
+                <FileTranslator />
+              </div>
+
             </div>
           }
         />
-        <Route path="/translate" element={<FileTranslator />} />
       </Routes>
-    </>
+    </div>
   )
 }
 

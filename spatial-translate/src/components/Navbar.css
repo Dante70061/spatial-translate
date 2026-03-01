@@ -1,119 +1,24 @@
 .navbar {
-  position: fixed;
-  bottom: 40px; 
-  left: 0;
-  right: 0;
-  margin: 0 auto;
-  width: 700px;
-  height: 60px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  
-  /* High-Density Initial State */
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(60px) saturate(250%) brightness(1.1);
-  border: 0.5px solid rgba(255, 255, 255, 0.35);
-  border-radius: 30px;
-  box-shadow: 
-    0 15px 45px rgba(0, 0, 0, 0.4),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
-    
-  color: white;
-  z-index: 2000;
-  
-  /* Simplified transition - removed entrance animation to fix initial transparency */
-  transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.5s ease, opacity 0.6s ease;
-  will-change: transform, opacity;
+  position: fixed; bottom: 40px; left: 0; right: 0; margin: 0 auto; width: 700px; height: 60px; display: flex; justify-content: center; align-items: center;
+  background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(60px) saturate(250%) brightness(1.1); border: 0.5px solid rgba(255, 255, 255, 0.35); border-radius: 30px; box-shadow: 0 15px 45px rgba(0, 0, 0, 0.4);
+  color: white; z-index: 2000;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.8s ease;
 }
 
-html.is-spatial .navbar {
-  background: transparent;
-  --xr-background-material: translucent;
-  --xr-back: 15;
-  bottom: 60px;
-}
+html.is-spatial .navbar { background: transparent; backdrop-filter: none !important; --xr-background-material: translucent; --xr-back: 15; bottom: 60px; }
+.navbar.active { transform: translateY(15px); background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); }
+html.is-spatial .navbar.active { transform: translateY(20px); }
 
-/* 
-   Docked state remains visible but slightly more subtle.
-*/
-.navbar.active {
-  transform: translateY(15px);
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-}
+.navbar-inner { width: 100%; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em; background: linear-gradient(180deg, #fff 0%, #4DA6FF 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.navbar-right { display: flex; align-items: center; gap: 12px; }
 
-html.is-spatial .navbar.active {
-  transform: translateY(20px);
-}
-
-.navbar-inner {
-  width: 100%;
-  padding: 0 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo {
-  font-weight: 700;
-  font-size: 1.1rem;
-  letter-spacing: -0.02em;
-  color: white;
-}
-
-.navbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.language-select {
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
-  outline: none;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
+.language-select { padding: 8px 14px; border-radius: 12px; border: 0.5px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.12); color: white; outline: none; cursor: pointer; font-size: 0.9rem; }
 .liquid-glass-button {
-  padding: 0 12px;
-  height: 36px;
-  min-width: 140px;
-  border-radius: 18px;
-  border: 0.5px solid rgba(255, 255, 255, 0.25);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.3s ease;
-  background: rgba(255, 255, 255, 0.12);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  position: relative;
-  text-align: center;
-  white-space: nowrap;
+  padding: 0 12px; height: 40px; min-width: 140px; border-radius: 20px; border: 0.5px solid rgba(255, 255, 255, 0.25); cursor: pointer; font-weight: 600; font-size: 0.9rem;
+  transition: background 0.3s ease; background: rgba(255, 255, 255, 0.12); color: white; display: flex; align-items: center; justify-content: center; text-decoration: none; text-align: center;
 }
 
-html.is-spatial .liquid-glass-button {
-  background: transparent;
-  --xr-background-material: thick; 
-  border: 0.5px solid rgba(255, 255, 255, 0.35);
-}
-
-.liquid-glass-button:hover {
-  transform: scale(1.04);
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.liquid-glass-button:active {
-  transform: scale(0.95);
-  background: rgba(255, 255, 255, 0.25);
-  transition: transform 0.1s ease;
-}
+html.is-spatial .liquid-glass-button { background: transparent; backdrop-filter: none !important; --xr-background-material: thick; border: 0.5px solid rgba(255, 255, 255, 0.35); }
+.liquid-glass-button:hover { background: rgba(255, 255, 255, 0.2); }
+.liquid-glass-button:active { opacity: 0.8; }

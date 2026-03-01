@@ -15,15 +15,11 @@ def handle_disconnect():
 @socketio.on('audio_data')
 def handle_audio_stream(data):
     angle = get_angle_relative(data)
-    transcript = "sadfasdf"
-    if transcript:
-        emit('transcript_update',
-             {
-                 'angle': angle,
-                 'text': transcript
-             },
-             broadcast=True)
-
-        print(f"Received audio: {len(data)} bytes | Angle: {angle} | Transcript: {transcript}")
-    else:
-        print(f"Received audio: {len(data)} bytes")
+    
+    # Always emit the direction update so the UI knows where the sound is coming from
+    emit('direction_update', {'angle': angle}, broadcast=True)
+    
+    # Optional: Keep transcript_update if needed for other parts, 
+    # but the listener hook expects direction_update for currentAngle.
+    # transcript = transcribe_chunk(data) 
+    # ... rest of logic ...

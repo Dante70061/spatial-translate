@@ -15,13 +15,31 @@ function App() {
     window.setAppLanguage = setAppLanguage;
   }, [appLanguage]);
 
-  const { history, interimText, isListening, audioLevels, start, stop } = useSpeechRecognition()
+  // Main window is the HOST (has the click gesture)
+  const { history, interimText, isListening, audioLevels, start, stop } = useSpeechRecognition({ passive: false })
   const [isStarting, setIsStarting] = useState(false)
   const openedSpeakers = useRef(new Set())
+  const windowRefs = useRef({}) // Store window objects to close them later
   const activeWindowsRef = useRef(new Set())
   const location = useLocation()
   
   const isSpeakerRoute = location.pathname.includes('/speaker/')
+
+  const handleReset = useCallback(() => {
+    console.log("[APP] handleReset called - Stopping engine and Closing Windows");
+    stop();
+    
+    // Close all tracked speaker windows
+    Object.keys(windowRefs.current).forEach(name => {
+      const win = windowRefs.current[name];
+      if (win && !win.closed) {
+        win.close();
+      }
+    });
+    windowRefs.current = {};
+    openedSpeakers.current.clear();
+    setIsStarting(false);
+  }, [stop]);
 
   useEffect(() => {
     const channel = new BroadcastChannel('captions_channel')
@@ -32,12 +50,7 @@ function App() {
           setIsStarting(false)
         } else if (e.data.status === 'closed') {
           activeWindowsRef.current.delete(e.data.speaker)
-          if (activeWindowsRef.current.size === 0 && isListening && !isStarting) {
-            stop()
-          }
         }
-      } else if (e.data.type === 'SYNC_REQUEST') {
-        channel.postMessage({ type: 'SYNC_RESPONSE', history })
       }
     }
     channel.addEventListener('message', handleMessage)
@@ -45,12 +58,43 @@ function App() {
       channel.removeEventListener('message', handleMessage)
       channel.close()
     }
-  }, [isListening, stop, isStarting, history])
+  }, [])
 
   const handleStart = () => {
+    console.log("[APP] handleStart called - Starting engine and Opening Speaker Window");
+    
+    // Resume/Kick AC synchronously in click handler
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        if (!window.__GLOBAL_AC__ || window.__GLOBAL_AC__.state === 'closed') {
+          window.__GLOBAL_AC__ = new AudioCtx({ sampleRate: 16000 });
+        }
+        const ac = window.__GLOBAL_AC__;
+        ac.resume();
+        const buffer = ac.createBuffer(1, 1, 22050);
+        const source = ac.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ac.destination);
+        source.start(0);
+      }
+    } catch (e) {
+      console.error("[APP] Failed to pre-warm AudioContext:", e);
+    }
+
     openedSpeakers.current.clear()
+    windowRefs.current = {}
     setIsStarting(true)
-    start()
+    
+    // Start local engine (has the gesture)
+    // We await the setup of audio nodes to ensure the session is active
+    start().then(() => {
+      // Small delay to ensure the AudioContext is fully "warmed up" 
+      // before opening a new window that might steal focus.
+      setTimeout(() => {
+        openSpeakerWindow('Live Captions')
+      }, 500);
+    });
   }
 
   const openSpeakerWindow = useCallback((speakerName) => {
@@ -68,23 +112,16 @@ function App() {
     if (typeof initScene === 'function') {
       initScene(sceneName, (prev) => ({
         ...prev,
-        defaultSize: { width: 1600, height: 600 },
+        defaultSize: { width: 1000, height: 500 },
         worldAlignment: 'adaptive'
       }))
     }
 
-    window.open(url, sceneName)
-  }, [])
-
-  useEffect(() => {
-    if (!isListening || isSpeakerRoute) return
-    history.forEach(item => openSpeakerWindow(item.speaker))
-    if (interimText.trim()) {
-      const isLeft = audioLevels.left > audioLevels.right
-      const currentSpeaker = isLeft ? 'Person A' : 'Person B'
-      openSpeakerWindow(currentSpeaker)
+    const win = window.open(url, sceneName)
+    if (win) {
+      windowRefs.current[speakerName] = win;
     }
-  }, [history, interimText, isListening, isSpeakerRoute, audioLevels, openSpeakerWindow])
+  }, [])
 
   useEffect(() => {
     if (isSpeakerRoute) document.documentElement.classList.add('is-speaker-page')
@@ -95,7 +132,7 @@ function App() {
     <div className="app-root" enable-xr-monitor>
       {!isSpeakerRoute && (
         <Navbar 
-          onReset={stop} 
+          onReset={handleReset} 
           isListening={isListening} 
           language={appLanguage}
           setLanguage={setAppLanguage}

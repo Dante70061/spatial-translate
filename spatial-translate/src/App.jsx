@@ -6,11 +6,9 @@ import Subtitles from "./components/Subtitles"
 import FileTranslator from "./components/FileTranslator"
 import { useSpeechRecognition } from "./hooks/listener"
 
-
-
 function App() {
   // SINGLE instance of speech recognition for subtitles
-  const { transcript, isListening, start, stop } = useSpeechRecognition()
+  const { transcript, isListening, error, start, stop } = useSpeechRecognition()
 
   return (
     <>
@@ -18,7 +16,7 @@ function App() {
       <Navbar onStart={start} onStop={stop} />
 
       <Routes>
-        {/* Main page: File upload + live subtitles */}
+        {/* ================= MAIN PAGE ================= */}
         <Route
           path="/"
           element={
@@ -30,23 +28,42 @@ function App() {
               {/* File upload (independent) */}
               <FileTranslator />
 
-              {/* Live subtitles from speech */}
+              {/* ERROR DISPLAY */}
+              {error && (
+                <div
+                  style={{
+                    marginTop: "20px",
+                    textAlign: "center",
+                    color: "#ff4d4d",
+                    fontWeight: "500",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              {/* Live subtitles */}
               <div style={{ marginTop: "50px", color: "white", textAlign: "center" }}>
                 <h1>Subtitles:</h1>
-                <p>{transcript || "Waiting for speech..."}</p>
+
+                {isListening && (
+                  <p style={{ color: "#4DA6FF", fontSize: "14px" }}>
+                    Listening...
+                  </p>
+                )}
+
+                <p style={{ fontSize: "20px" }}>
+                  {transcript || "Waiting for speech..."}
+                </p>
               </div>
             </>
           }
         />
 
-        {/* Translate page */}
+        {/* ================= TRANSLATE PAGE ================= */}
         <Route
           path="/translate"
-          element={
-            <>
-              <Subtitles />
-            </>
-          }
+          element={<Subtitles />}
         />
       </Routes>
     </>

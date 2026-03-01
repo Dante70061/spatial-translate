@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { Routes, Route, useLocation } from "react-router-dom"
 import Navbar from "./components/Navbar"
 import FileTranslator from "./components/FileTranslator"
@@ -8,11 +8,60 @@ import { initScene } from "@webspatial/react-sdk"
 
 function App() {
   const { history, interimText, isListening, audioLevels, start, stop } = useSpeechRecognition()
+  const [isStarting, setIsStarting] = useState(false);
   const openedSpeakers = useRef(new Set());
+  const activeWindowsRef = useRef(new Set());
   const location = useLocation();
   const isSpeakerRoute = location.pathname.includes('/speaker/');
 
-  // Apply a class to <html> for speaker windows (so they have transparent backgrounds)
+  // Watchdog to see if bubbles are still open
+  useEffect(() => {
+    const channel = new BroadcastChannel('captions_channel');
+    
+    channel.onmessage = (e) => {
+      if (e.data.type === 'WINDOW_STATUS') {
+        if (e.data.status === 'open') {
+          activeWindowsRef.current.add(e.data.speaker);
+          setIsStarting(false); // First window is open, we are officially active
+        } else if (e.data.status === 'closed') {
+          activeWindowsRef.current.delete(e.data.speaker);
+          
+          if (activeWindowsRef.current.size === 0 && isListening && !isStarting) {
+            console.log("Last window closed, recovering UI...");
+            stop();
+          }
+        }
+      }
+    };
+
+    // Periodic safety check with a grace period
+    const checkInterval = setInterval(() => {
+      // Only check if we are NOT in the middle of starting up
+      if (isListening && !isStarting && activeWindowsRef.current.size > 0) {
+        const snapshot = new Set(activeWindowsRef.current);
+        activeWindowsRef.current.clear();
+        channel.postMessage({ type: 'PING' });
+        
+        setTimeout(() => {
+          if (activeWindowsRef.current.size === 0 && isListening && !isStarting) {
+            console.log("Heartbeat failed, recovering UI...");
+            stop();
+          }
+        }, 1500);
+      }
+    }, 4000);
+
+    return () => {
+      clearInterval(checkInterval);
+      channel.close();
+    };
+  }, [isListening, stop, isStarting]);
+
+  const handleStart = () => {
+    setIsStarting(true);
+    start();
+  };
+
   useEffect(() => {
     if (isSpeakerRoute) {
       document.documentElement.classList.add('is-speaker-page');
@@ -21,25 +70,21 @@ function App() {
     }
   }, [isSpeakerRoute]);
 
-  // Reset tracking when recording stops
   useEffect(() => {
     if (!isListening) {
       openedSpeakers.current.clear();
     }
   }, [isListening]);
 
-  // Automatically open windows for new speakers
   useEffect(() => {
     if (!isListening || isSpeakerRoute) return;
 
-    // Check history for new speakers
     history.forEach(item => {
       if (!openedSpeakers.current.has(item.speaker)) {
         openSpeakerWindow(item.speaker);
       }
     });
 
-    // Also check interim for the current speaker
     if (interimText.trim()) {
       const isLeft = audioLevels.left > audioLevels.right;
       const currentSpeaker = isLeft ? 'Person A' : 'Person B';
@@ -56,7 +101,7 @@ function App() {
     if (typeof initScene === 'function') {
       initScene(sceneName, (prev) => ({
         ...prev,
-        defaultSize: { width: 600, height: 400 }
+        defaultSize: { width: 1000, height: 800 }
       }));
     }
 
@@ -70,66 +115,37 @@ function App() {
 
   return (
     <>
-      {!isSpeakerRoute && <Navbar onStart={start} onStop={stop} isListening={isListening} />}
+      {!isSpeakerRoute && <Navbar onReset={stop} />}
 
       <Routes>
         <Route path="/speaker/:speakerName" element={<SpeakerCaption />} />
         <Route
           path="/"
           element={
-            <div className={`main-page-container ${isListening ? 'collapsed' : ''}`} enable-xr="true">
-              <div style={{ marginTop: "100px", textAlign: "center" }}>
-                <h1>Vision Pro Auto-Caption</h1>
-                <p style={{ color: "rgba(255,255,255,0.6)" }}>
-                  Captions will spawn in separate windows for each speaker.
-                </p>
-              </div>
+            <div className={`home-page ${isListening ? 'collapsed' : ''}`} enable-xr="true">
+              {!isListening && (
+                <div className="home-content">
+                  <div style={{ textAlign: "center", marginBottom: "40px" }}>
+                    <h1>Vision Pro Auto-Caption</h1>
+                    <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "1.2rem" }}>
+                      Experience spatial, person-anchored captions.
+                    </p>
+                  </div>
 
-              {/* Audio Visualizer Test Section */}
-              <div style={{ marginTop: "30px", textAlign: "center", color: "white" }}>
-                <h3>Audio Channel Levels (Testing)</h3>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  gap: '40px', 
-                  alignItems: 'flex-end', 
-                  height: '250px', 
-                  marginBottom: '10px',
-                  background: 'rgba(0,0,0,0.2)',
-                  width: '300px',
-                  margin: '30px auto',
-                  padding: '20px',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}>
-                  <div style={{ 
-                    width: '60px', 
-                    background: 'linear-gradient(to top, #ff4da6, #ff80bf)', 
-                    height: `${Math.sqrt(audioLevels.left) * 100}%`, 
-                    minHeight: '4px',
-                    transition: 'height 0.05s ease', 
-                    borderRadius: '10px 10px 2px 2px',
-                    boxShadow: `0 0 ${audioLevels.left * 20}px #ff4da6`
-                  }}></div>
-                  <div style={{ 
-                    width: '60px', 
-                    background: 'linear-gradient(to top, #4dff88, #80ffaa)', 
-                    height: `${Math.sqrt(audioLevels.right) * 100}%`, 
-                    minHeight: '4px',
-                    transition: 'height 0.05s ease', 
-                    borderRadius: '10px 10px 2px 2px',
-                    boxShadow: `0 0 ${audioLevels.right * 20}px #4dff88`
-                  }}></div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '80px', marginTop: '-10px', fontWeight: 'bold' }}>
-                  <span style={{ color: '#ff4da6' }}>LEFT (A)</span>
-                  <span style={{ color: '#4dff88' }}>RIGHT (B)</span>
-                </div>
-              </div>
+                  {/* The Centralized Hero Interaction */}
+                  <button 
+                    className="liquid-glass-button hero-start" 
+                    onClick={handleStart}
+                    style={{ width: '280px', height: '60px', borderRadius: '30px', fontSize: '1.1rem' }}
+                  >
+                    Start Spatial Captions
+                  </button>
 
-              <div style={{ marginTop: "50px", color: "white", textAlign: "center", padding: '20px' }}>
-                <p style={{ opacity: 0.5 }}>Click "Start Listening" in the navbar to begin.</p>
-              </div>
+                  <div style={{ marginTop: "60px", color: "white", textAlign: "center", opacity: 0.4 }}>
+                    <p>Speak to spawn anchored bubbles in your space.</p>
+                  </div>
+                </div>
+              )}
             </div>
           }
         />

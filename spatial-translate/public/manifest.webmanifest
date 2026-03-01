@@ -1,4 +1,14 @@
 {
+  "name": "Spatial Translate",
+  "start_url": "/",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
   "xr_main_scene": {
     "default_size": {
       "width": 1920,

@@ -4,11 +4,15 @@ import { useState, useEffect, useRef } from 'react';
 export function useSpeechRecognition() {
   const [transcript, setTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      setError('Speech recognition is not supported in this browser.');
+      return;
+    }
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
@@ -32,13 +36,35 @@ export function useSpeechRecognition() {
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    recognition.onerror = (e) => console.error(e.error);
+
+    recognition.onerror = (event) => {
+      switch (event.error) {
+        case 'not-allowed':
+          setError('Microphone access was denied. Please allow microphone permissions and try again.');
+          break;
+        case 'audio-capture':
+          setError('No microphone was found. Please connect a microphone and try again.');
+          break;
+        case 'network':
+          setError('A network error occurred. Please check your connection.');
+          break;
+        case 'no-speech':
+          setError('No speech was detected. Please try again.');
+          break;
+        default:
+          setError(`An error occurred: ${event.error}`);
+      }
+      setIsListening(false);
+    };
 
     recognitionRef.current = recognition;
   }, []);
 
-  const start = () => recognitionRef.current?.start();
+  const start = () => {
+    setError(null);
+    recognitionRef.current?.start();
+  };
   const stop = () => recognitionRef.current?.stop();
 
-  return { transcript, isListening, start, stop };
+  return { transcript, isListening, error, start, stop };
 }

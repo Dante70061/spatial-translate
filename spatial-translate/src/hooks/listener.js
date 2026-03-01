@@ -9,53 +9,106 @@ export function useSpeechRecognition() {
   const [isListening, setIsListening] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
   const [audioLevels, setAudioLevels] = useState({ left: 0, right: 0 });
+  const audioLevelsRef = useRef({ left: 0, right: 0 });
   
   const recognitionRef = useRef(null);
   const shouldBeListening = useRef(false);
   const mediaStream = useRef(null);
   const audioContextRef = useRef(null);
 
+  const currentAngleRef = useRef(0);
+
   useEffect(() => {
-    socket.on('direction_update', (data) => {
+    const handleDirectionUpdate = (data) => {
       setCurrentAngle(data.angle);
-    });
+      currentAngleRef.current = data.angle;
+    };
+
+    socket.on('direction_update', handleDirectionUpdate);
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.continuous = true;
+    recognition.continuous = true; // Better for fast speech
     recognition.interimResults = true;
 
+    let silenceTimer;
+    let lastProcessedIndex = -1;
+    let sessionStartTime = Date.now();
+
     recognition.onresult = (event) => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+
       let interim = '';
+      // Only process from the last known resultIndex to avoid duplicates and sluggishness
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          // Use the dominant channel for identification
-          const isLeft = audioLevels.left > audioLevels.right;
-          setHistory(prev => [...prev, { 
-            text: transcript, 
-            angle: isLeft ? -10 : 10,
-            speaker: isLeft ? 'Person A' : 'Person B'
-          }]);
+          // Double check we haven't processed this index in this session
+          if (i > lastProcessedIndex) {
+            if (!transcript.trim()) continue;
+            
+            const isLeft = audioLevelsRef.current.left > audioLevelsRef.current.right;
+            setHistory(prev => [...prev, { 
+              text: transcript, 
+              angle: isLeft ? -10 : 10,
+              speaker: isLeft ? 'Person A' : 'Person B'
+            }]);
+            lastProcessedIndex = i;
+          }
         } else {
           interim += transcript;
         }
       }
+
       setInterimText(interim);
+
+      // Force refresh if the session is getting too long (sluggishness prevention)
+      // or if silence is detected for too long
+      const sessionDuration = Date.now() - sessionStartTime;
+      const shouldRefresh = sessionDuration > 30000; // 30 seconds
+
+      if (interim.trim()) {
+        silenceTimer = setTimeout(() => {
+          recognition.stop(); 
+        }, 1500); // Slightly longer for fast talkers
+      } else if (shouldRefresh) {
+        recognition.stop();
+      }
+    };
+
+    recognition.onstart = () => {
+      sessionStartTime = Date.now();
+      lastProcessedIndex = -1;
+      console.log("Recognition session started");
     };
 
     recognition.onend = () => {
       if (shouldBeListening.current) {
+        console.log("Restarting recognition...");
+        try { recognition.start(); } catch (e) {}
+      }
+    };
+
+    recognition.onend = () => {
+      if (shouldBeListening.current) {
+        console.log("Recognition ended, restarting...");
         try { recognition.start(); } catch (e) {}
       }
     };
 
     recognitionRef.current = recognition;
-    return () => socket.off('direction_update');
-  }, [currentAngle]);
+    
+    return () => {
+      socket.off('direction_update', handleDirectionUpdate);
+      if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      }
+    };
+  }, []); // Empty dependency array: run once on mount
 
   const start = async () => {
     shouldBeListening.current = true;
@@ -106,7 +159,9 @@ export function useSpeechRecognition() {
           interleaved[i*2] = lVal * 0x7FFF;
           interleaved[i*2+1] = rVal * 0x7FFF;
         }
-        setAudioLevels({ left: lMax, right: rMax });
+        const levels = { left: lMax, right: rMax };
+        setAudioLevels(levels);
+        audioLevelsRef.current = levels;
         socket.emit('audio_data', interleaved.buffer);
       };
 
@@ -125,6 +180,7 @@ export function useSpeechRecognition() {
     setIsListening(false);
     setInterimText('');
     setAudioLevels({ left: 0, right: 0 });
+    audioLevelsRef.current = { left: 0, right: 0 };
   };
 
   return { history, interimText, isListening, audioLevels, start, stop };

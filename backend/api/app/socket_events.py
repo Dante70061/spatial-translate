@@ -15,7 +15,7 @@ def handle_disconnect():
 @socketio.on('audio_data')
 def handle_audio_stream(data):
     angle = get_angle_relative(data)
-    transcript = transcribe_chunk(data)
+    transcript = "sadfasdf"
     if transcript:
         emit('transcript_update',
              {

@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [
       react(),
       tailwindcss(),
+      webSpatial(),
       createHtmlPlugin({
           inject: {
               data: {

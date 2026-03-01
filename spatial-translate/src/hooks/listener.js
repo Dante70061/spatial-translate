@@ -1,10 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('https://spatial-translate-11.onrender.com/api/audio/');
+// Use local backend by default for development, fallback to render if needed
+/* global __XR_ENV_BASE__ */
+const SOCKET_URL = 'https://spatial-translate-11.onrender.com';
+
+const socket = io(SOCKET_URL, {
+  path: '/socket.io/',
+  transports: ['websocket', 'polling']
+});
 
 export function useSpeechRecognition() {
   const [history, setHistory] = useState([]);
+  const historyRef = useRef([]);
   const [interimText, setInterimText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
@@ -31,35 +39,61 @@ export function useSpeechRecognition() {
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.continuous = true; // Better for fast speech
+    recognition.continuous = true; 
     recognition.interimResults = true;
 
     let silenceTimer;
     let lastProcessedIndex = -1;
     let sessionStartTime = Date.now();
 
+    const channel = new BroadcastChannel('captions_channel');
+    
+    // Support "late joiners" by responding to sync requests
+    channel.onmessage = (e) => {
+      if (e.data.type === 'SYNC_REQUEST') {
+        console.log("Received SYNC_REQUEST, sending history...");
+        channel.postMessage({ type: 'SYNC_RESPONSE', history: historyRef.current });
+      }
+    };
+
     recognition.onresult = (event) => {
       if (silenceTimer) clearTimeout(silenceTimer);
 
       let interim = '';
-      // Only process from the last known resultIndex to avoid duplicates and sluggishness
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
+        const isLeft = audioLevelsRef.current.left > audioLevelsRef.current.right;
+        const currentSpeaker = isLeft ? 'Person A' : 'Person B';
+
         if (event.results[i].isFinal) {
-          // Double check we haven't processed this index in this session
           if (i > lastProcessedIndex) {
             if (!transcript.trim()) continue;
             
-            const isLeft = audioLevelsRef.current.left > audioLevelsRef.current.right;
-            setHistory(prev => [...prev, { 
+            const newItem = { 
               text: transcript, 
               angle: isLeft ? -10 : 10,
-              speaker: isLeft ? 'Person A' : 'Person B'
-            }]);
+              speaker: currentSpeaker
+            };
+
+            setHistory(prev => {
+              const updated = [...prev, newItem];
+              historyRef.current = updated;
+              return updated;
+            });
+            
+            // Broadcast final text
+            console.log(`Broadcasting FINAL for ${currentSpeaker}: ${transcript}`);
+            channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: transcript, isFinal: true });
+            
             lastProcessedIndex = i;
           }
         } else {
           interim += transcript;
+          // Broadcast interim text
+          if (interim.trim()) {
+            console.log(`Broadcasting INTERIM for ${currentSpeaker}: ${interim}`);
+            channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: interim, isFinal: false });
+          }
         }
       }
 
@@ -67,15 +101,13 @@ export function useSpeechRecognition() {
 
       // Force refresh only if the session is getting very long to maintain stability
       const sessionDuration = Date.now() - sessionStartTime;
-      const shouldRefresh = sessionDuration > 300000; // 5 minutes instead of 30s
+      const shouldRefresh = sessionDuration > 300000; 
 
       if (interim.trim()) {
         silenceTimer = setTimeout(() => {
-          console.log("Significant silence, finalizing...");
           recognition.stop(); 
-        }, 3000); // 3 seconds instead of 1.5s
+        }, 5000); 
       } else if (shouldRefresh) {
-        console.log("Session limit reached, refreshing engine...");
         recognition.stop();
       }
     };
@@ -83,20 +115,15 @@ export function useSpeechRecognition() {
     recognition.onstart = () => {
       sessionStartTime = Date.now();
       lastProcessedIndex = -1;
-      console.log("Recognition session started");
     };
 
     recognition.onend = () => {
       if (shouldBeListening.current) {
-        console.log("Restarting recognition...");
-        try { recognition.start(); } catch (e) {}
-      }
-    };
-
-    recognition.onend = () => {
-      if (shouldBeListening.current) {
-        console.log("Recognition ended, restarting...");
-        try { recognition.start(); } catch (e) {}
+        try { 
+          recognition.start(); 
+        } catch (e) {
+          if (e.name !== 'InvalidStateError') console.error("Recognition start failed:", e);
+        }
       }
     };
 
@@ -104,30 +131,29 @@ export function useSpeechRecognition() {
     
     return () => {
       socket.off('direction_update', handleDirectionUpdate);
+      channel.close();
       if (recognitionRef.current) {
         recognitionRef.current.onend = null;
         recognitionRef.current.stop();
       }
     };
-  }, []); // Empty dependency array: run once on mount
+  }, []); 
 
   const start = async () => {
     shouldBeListening.current = true;
     setIsListening(true);
     
-    // Start Speech Recognition FIRST
     try {
       recognitionRef.current?.start();
     } catch (e) {
       console.log("Recognition already started");
     }
 
-    // THEN Start Raw Audio Capture for the backend angle calculation
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
-          channelCount: 2, // Request stereo specifically
-          echoCancellation: false // True stereo often requires this to be false
+          channelCount: 2, 
+          echoCancellation: false 
         } 
       });
       mediaStream.current = stream;
@@ -135,7 +161,6 @@ export function useSpeechRecognition() {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       audioContextRef.current = audioContext;
       
-      // CRITICAL: Resume AudioContext after a user gesture (the click)
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
       }

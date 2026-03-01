@@ -76,3 +76,9 @@
   justify-content: space-between;
   align-items: center;
 }
+
+.control-button.translate {
+  background: #4DA6FF;
+  color: white;
+  margin-left: 10px;
+}

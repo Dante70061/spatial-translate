@@ -18,7 +18,7 @@ client = None
 if api_key:
     client = genai.Client(api_key=api_key)
 
-@translate_bp.route("/", methods=["POST"])
+@translate_bp.route("/translate-file", methods=["POST"])
 def translate_file():
     if not client:
         return jsonify({"error": "GEMINI_API_KEY not found in environment variables."}), 500

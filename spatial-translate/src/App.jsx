@@ -23,7 +23,7 @@ function App() {
                 <h1>Vision Pro Auto-Caption</h1>
               </div>
 
-              <FileTranslator />
+              
 
               {/* Audio Visualizer Test Section */}
               <div style={{ marginTop: "30px", textAlign: "center", color: "white" }}>
@@ -98,7 +98,7 @@ function App() {
             </>
           }
         />
-        <Route path="/translate" element={<Subtitles />} />
+        <Route path="/translate" element={<FileTranslator />} />
       </Routes>
     </>
   )

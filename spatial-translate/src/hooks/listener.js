@@ -65,16 +65,17 @@ export function useSpeechRecognition() {
 
       setInterimText(interim);
 
-      // Force refresh if the session is getting too long (sluggishness prevention)
-      // or if silence is detected for too long
+      // Force refresh only if the session is getting very long to maintain stability
       const sessionDuration = Date.now() - sessionStartTime;
-      const shouldRefresh = sessionDuration > 30000; // 30 seconds
+      const shouldRefresh = sessionDuration > 300000; // 5 minutes instead of 30s
 
       if (interim.trim()) {
         silenceTimer = setTimeout(() => {
+          console.log("Significant silence, finalizing...");
           recognition.stop(); 
-        }, 1500); // Slightly longer for fast talkers
+        }, 3000); // 3 seconds instead of 1.5s
       } else if (shouldRefresh) {
+        console.log("Session limit reached, refreshing engine...");
         recognition.stop();
       }
     };

@@ -2,25 +2,23 @@ import React, { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import "./Navbar.css"
 
-export default function Navbar({ onStart, onStop }) {
-  const [isRunning, setIsRunning] = useState(false)
+export default function Navbar({ onStart, onStop, isListening }) {
   const [language, setLanguage] = useState("Spanish")
   const location = useLocation() // get current route
 
   const handleToggle = () => {
-    if (isRunning) {
+    if (isListening) {
       onStop && onStop() // stop speech recognition
     } else {
       onStart && onStart() // start speech recognition
     }
-    setIsRunning(!isRunning)
   }
 
   // hide Start/Stop button if on /translate
   const showStartButton = location.pathname !== "/translate"
 
   return (
-    <nav className="navbar">
+    <nav className="navbar" enable-xr="true">
       <div className="navbar-inner">
 
         {/* Left - Logo */}
@@ -34,6 +32,7 @@ export default function Navbar({ onStart, onStop }) {
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             className="language-select"
+            enable-xr="true"
           >
             <option>Spanish</option>
             <option>French</option>
@@ -45,21 +44,30 @@ export default function Navbar({ onStart, onStop }) {
           {/* Start/Stop button only shows when not on /translate */}
           {showStartButton && (
             <button
-              className={`control-button ${isRunning ? "stop" : "start"}`}
+              className={`liquid-glass-button ${isListening ? "stop" : "start"}`}
               onClick={handleToggle}
+              enable-xr="true"
             >
-              {isRunning ? "Stop" : "Start"}
+              {isListening ? "Stop" : "Start"}
             </button>
           )}
 
           {/* PDF Translate button */}
-          <Link to="/translate">
-            <button className="control-button translate">PDF Translate</button>
+          <Link 
+            to="/translate" 
+            className="liquid-glass-button translate" 
+            enable-xr="true"
+          >
+            PDF Translate
           </Link>
 
           {/* Live Captions button */}
-          <Link to="/">
-            <button className="control-button translate">Live Captions</button>
+          <Link 
+            to="/" 
+            className="liquid-glass-button translate" 
+            enable-xr="true"
+          >
+            Live Captions
           </Link>
         </div>
 

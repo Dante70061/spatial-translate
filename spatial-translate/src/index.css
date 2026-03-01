@@ -13,33 +13,66 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-/* ✅ FIXED BODY */
+/* Base Styles */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* ✅ This will center your main content */
 #root {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 100px; /* space for fixed navbar */
   width: 100%;
 }
 
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
+}
+
+/* Spatial Overrides */
+html.is-spatial {
+  background-color: transparent !important;
+  --xr-background-material: transparent;
+}
+
+html.is-spatial body {
+  background-color: transparent !important;
+}
+
+/* Main Page Wall */
+.main-page-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(30, 30, 35, 0.9);
+  backdrop-filter: blur(20px);
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s ease;
+  z-index: 1;
+}
+
+html.is-spatial .main-page-container {
+  background: transparent;
+  --xr-background-material: translucent;
+}
+
+/* Collapse Animation */
+.main-page-container.collapsed {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Speaker Window specific */
+html.is-spatial.is-speaker-page .main-page-container {
+  --xr-background-material: transparent;
+  background: transparent;
 }

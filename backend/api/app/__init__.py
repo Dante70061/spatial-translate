@@ -11,7 +11,7 @@ def create_app():
     socketio.init_app(app)
     
     from . import socket_events
-    from .routes.translate_file import translate_bp
-    app.register_blueprint(translate_bp)
+    from .routes import register_routes
+    register_routes(app)
 
     return app

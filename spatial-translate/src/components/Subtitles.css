@@ -3,7 +3,7 @@
   width: 100vw; 
   height: 100vh; 
   display: flex; 
-  align-items: center; /* Center vertically in the window space */
+  align-items: center; 
   justify-content: center; 
   background: transparent !important; 
   box-sizing: border-box; 
@@ -11,136 +11,83 @@
 }
 
 .speaker-caption-container {
-  width: 90%; 
-  max-width: 800px; 
-  min-height: 160px;
-  height: auto; /* Let it grow with text */
-  border-radius: 44px; 
+  width: 95%; 
+  max-width: 1100px; 
+  height: 450px; /* INCREASED HEIGHT FOR MONOLOGUES */
+  border-radius: 50px; 
   background: rgba(255, 255, 255, 0.08); 
   backdrop-filter: blur(40px) saturate(180%); 
   display: flex; 
   flex-direction: column; 
-  overflow: visible; /* Don't clip animations */
-  animation: liquidEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  animation: liquidEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
 @keyframes liquidEntrance { 
-  0% { opacity: 0; transform: scale(0.95) translateY(20px); } 
-  100% { opacity: 1; transform: scale(1) translateY(0); } 
-}
-
-html.is-spatial.is-speaker-page {
-  --xr-background-material: transparent !important;
+  0% { transform: scale(0.98) translateY(15px); } 
+  100% { transform: scale(1) translateY(0); } 
 }
 
 html.is-spatial .speaker-caption-container {
   --xr-background-material: translucent !important;
   background: transparent !important;
-  background-color: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   opacity: 1 !important;
 }
 
 .speaker-header { 
-  padding: 24px 32px 12px; 
-  background: transparent;
+  padding: 28px 44px 12px; 
   display: flex; 
   align-items: center; 
-  gap: 12px;
-}
-
-.live-star-container {
-  position: relative;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 4px;
-}
-
-.live-star-core {
-  width: 8px;
-  height: 8px;
-  background: #4dff88;
-  border-radius: 50%;
-  box-shadow: 0 0 10px #4dff88;
-  z-index: 2;
-  animation: corePulse 1.5s ease-in-out infinite;
-}
-
-.live-star-flash {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: rgba(77, 255, 136, 0.4);
-  animation: starFlash 1.5s ease-out infinite;
-}
-
-@keyframes corePulse {
-  0%, 100% { transform: scale(1); filter: brightness(1); }
-  50% { transform: scale(1.1); filter: brightness(1.3); }
-}
-
-@keyframes starFlash {
-  0% { transform: scale(0.5); opacity: 1; }
-  100% { transform: scale(3.5); opacity: 0; }
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 .speaker-label { 
-  font-size: 1rem; 
+  font-size: 1.2rem; 
   font-weight: 700; 
   text-transform: uppercase; 
   letter-spacing: 0.2em; 
   color: rgba(255, 255, 255, 0.9); 
   margin: 0; 
-  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
-  text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+  font-family: 'Lato', sans-serif;
 }
 
 .captions-area { 
-  padding: 12px 36px 48px; 
-  font-size: 2.6rem; 
-  line-height: 1.25; 
-  font-weight: 600; 
-  letter-spacing: -0.015em;
-  min-height: 140px; 
+  padding: 12px 44px 48px; 
+  height: 350px; /* INCREASED TEXT AREA */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* ANCHOR TO BOTTOM */
+}
+
+.captions-content-inner {
   display: block; 
-  color: #ffffff;
-  -webkit-font-smoothing: antialiased;
-  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  text-align: left;
+  width: 100%;
 }
 
 .final-text { 
   display: inline;
-  color: rgba(255, 255, 255, 0.96); 
-  animation: textFloat 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  transition: opacity 0.8s ease, filter 0.8s ease;
-  will-change: opacity, transform, filter;
-}
-
-.interim-text { 
-  display: inline;
-  color: rgba(255, 255, 255, 0.45); 
-  font-style: normal; 
-  filter: blur(0.4px);
-  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: color, filter;
+  font-family: 'Lato', sans-serif;
+  font-size: 3.2rem; 
+  font-weight: 700;
+  line-height: 1.4;
+  color: #ffffff;
+  animation: textFloat 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transition: opacity 0.6s ease;
+  white-space: pre-wrap;
 }
 
 @keyframes textFloat {
-  0% { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+  0% { opacity: 0; transform: translateY(6px); filter: blur(2px); }
   100% { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
-/* Subtle exit animation for when React removes the element */
-.final-text.exiting {
-  opacity: 0;
-  filter: blur(4px);
-  transform: translateY(-4px);
-}
+.live-star-container { position: relative; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; margin-right: 6px; }
+.live-star-core { width: 10px; height: 10px; background: #4dff88; border-radius: 50%; box-shadow: 0 0 12px #4dff88; z-index: 2; animation: corePulse 1.5s ease-in-out infinite; }
+.live-star-flash { position: absolute; width: 100%; height: 100%; border-radius: 50%; background: rgba(77, 255, 136, 0.4); animation: starFlash 1.5s ease-out infinite; }
+@keyframes corePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes starFlash { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(3.5); opacity: 0; } }

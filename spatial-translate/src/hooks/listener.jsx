@@ -12,308 +12,217 @@ const socket = io(SOCKET_URL, {
 
 export function useSpeechRecognition({ passive = false } = {}) {
   const [history, setHistory] = useState([]);
-  const [interimText, setInterimText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [audioLevels, setAudioLevels] = useState({ left: 0, right: 0 });
 
-  const recognitionRef = useRef(null);
   const voskModelRef = useRef(null);
   const voskRecognizerRef = useRef(null);
+  const recognizerReadyRef = useRef(false);
   const audioContextRef = useRef(null);
   const mediaStream = useRef(null);
   const shouldBeListening = useRef(false);
-  const committedTextRef = useRef('');
   const currentAngleRef = useRef(0);
   const audioLevelsRef = useRef({ left: 0, right: 0 });
-  const pauseTimer = useRef(null);
-  const currentInterimRef = useRef('');
-  const lastProcessedIndex = useRef(-1);
+  const lastCommittedWordCountRef = useRef(0);
 
-  const visibilityHandlerRef = useRef(null);
   const heartbeatRef = useRef(null);
   const processorRef = useRef(null);
-  
-  // Persistent refs to avoid "node already created" errors
-  const audioSourceNodeRef = useRef(null);
-  const micSourceNodeRef = useRef(null);
-  const debugAudioRef = useRef(null);
+  const broadcastChannelRef = useRef(null);
 
-  // --- PASSIVE MODE LOGIC ---
+  const historyRef = useRef([]);
+  const isListeningRef = useRef(false);
+
   useEffect(() => {
-    if (!passive) return;
-    const channel = new BroadcastChannel('captions_channel');
-    const handleMessage = (e) => {
-      if (e.data.type === 'SYNC_STATE') {
-        setHistory(e.data.history || []);
-        setInterimText(e.data.interimText || '');
-        setIsListening(e.data.isListening || false);
-        setAudioLevels(e.data.audioLevels || {left:0, right:0});
-      } else if (e.data.type === 'CAPTION') {
-        if (e.data.isFinal) {
-           setHistory(prev => [...prev, e.data].slice(-10));
-           setInterimText('');
-        } else {
-           setInterimText(e.data.text);
-        }
-      }
-    };
-    channel.addEventListener('message', handleMessage);
-    channel.postMessage({ type: 'SYNC_REQUEST' });
-    return () => {
-      channel.removeEventListener('message', handleMessage);
-      channel.close();
-    };
-  }, [passive]);
+    historyRef.current = history;
+    isListeningRef.current = isListening;
+  }, [history, isListening]);
+
+  useEffect(() => {
+    broadcastChannelRef.current = new BroadcastChannel('captions_channel');
+    return () => { if (broadcastChannelRef.current) broadcastChannelRef.current.close(); };
+  }, []);
 
   const broadcastState = useCallback(() => {
-    if (passive) return;
-    const channel = new BroadcastChannel('captions_channel');
-    channel.postMessage({
+    if (passive || !broadcastChannelRef.current) return;
+    broadcastChannelRef.current.postMessage({
       type: 'SYNC_STATE',
-      history,
-      interimText,
-      isListening,
+      history: historyRef.current,
+      isListening: isListeningRef.current,
       audioLevels: audioLevelsRef.current
     });
-    channel.close();
-  }, [passive, history, interimText, isListening]);
+  }, [passive]);
 
   useEffect(() => {
     if (!passive && isListening) broadcastState();
-  }, [passive, history, interimText, isListening, broadcastState]);
+  }, [passive, history, isListening, broadcastState]);
 
-  const commitCurrent = (text, speaker, isFinal) => {
-    if (!text.trim()) return;
-    const cleanText = text.trim();
-    if (isFinal) {
-      const newItem = { speaker, text: cleanText, id: Date.now(), timestamp: Date.now(), angle: currentAngleRef.current, isPause: true };
-      setHistory(prev => [...prev, newItem].slice(-10));
-      setInterimText('');
-      currentInterimRef.current = '';
-      const channel = new BroadcastChannel('captions_channel');
-      channel.postMessage({ type: 'CAPTION', ...newItem, isFinal: true });
-      channel.close();
-    } else {
-      setInterimText(cleanText);
-      const channel = new BroadcastChannel('captions_channel');
-      channel.postMessage({ type: 'CAPTION', text: cleanText, speaker, isFinal: false });
-      channel.close();
+  const commitCurrent = useCallback((text, speaker, isFinal) => {
+    const rawText = (text || '').trim();
+    if (!rawText) {
+      if (isFinal) {
+        lastCommittedWordCountRef.current = 0;
+        const prev = historyRef.current;
+        if (prev.length === 0 || prev[prev.length-1].isPause) return;
+        const next = [...prev.slice(0, -1), { ...prev[prev.length-1], isPause: true }];
+        setHistory(next);
+        broadcastChannelRef.current?.postMessage({ type: 'CAPTION_BATCH', history: next });
+      }
+      return;
     }
-  };
 
-  const setupRecognition = (rec) => {
-    rec.onresult = (event) => {
-      let interim = '';
-      let nativeFinal = '';
-      const currentSpeaker = 'Live Captions';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          if (i > lastProcessedIndex.current) { nativeFinal = transcript; lastProcessedIndex.current = i; }
-        } else interim += transcript;
-      }
-      if (nativeFinal) { commitCurrent(nativeFinal, currentSpeaker, true); committedTextRef.current = ''; return; }
-      if (interim.trim()) {
-        let displayInterim = interim;
-        if (committedTextRef.current && interim.startsWith(committedTextRef.current)) {
-          displayInterim = interim.substring(committedTextRef.current.length).trim();
+    const allWords = rawText.split(/\s+/).filter(w => w.length > 0);
+    const newWords = allWords.slice(lastCommittedWordCountRef.current);
+    const COMMIT_SIZE = 8;
+    const LOOKBACK_BUFFER = 2;
+
+    if (isFinal || newWords.length >= (COMMIT_SIZE + LOOKBACK_BUFFER)) {
+      const wordsToCommit = isFinal ? newWords : newWords.slice(0, COMMIT_SIZE);
+      const commitStr = wordsToCommit.join(' ').trim();
+      
+      if (commitStr.length > 0) {
+        const newItem = { speaker, text: commitStr, id: Date.now() + Math.random(), timestamp: Date.now(), angle: currentAngleRef.current, isPause: isFinal };
+        const next = [...historyRef.current, newItem].slice(-25);
+        setHistory(next);
+        broadcastChannelRef.current?.postMessage({ type: 'CAPTION_BATCH', history: next });
+        lastCommittedWordCountRef.current += wordsToCommit.length;
+      } else if (isFinal) {
+        const prev = historyRef.current;
+        if (prev.length > 0 && !prev[prev.length-1].isPause) {
+          const next = [...prev.slice(0, -1), { ...prev[prev.length-1], isPause: true }];
+          setHistory(next);
+          broadcastChannelRef.current?.postMessage({ type: 'CAPTION_BATCH', history: next });
         }
-        if (displayInterim.length > 60) { commitCurrent(interim, currentSpeaker, false); return; }
-        setInterimText(displayInterim);
-        currentInterimRef.current = displayInterim;
-        const channel = new BroadcastChannel('captions_channel');
-        channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: displayInterim, isFinal: false });
-        channel.close();
-        if (pauseTimer.current) clearTimeout(pauseTimer.current);
-        pauseTimer.current = setTimeout(() => { if (currentInterimRef.current) commitCurrent(interim, currentSpeaker, true); }, 1200);
       }
-    };
-    rec.onerror = (e) => console.error("[RECOGNITION] Error:", e.error);
-    rec.onend = () => { if (shouldBeListening.current) try { rec.start(); lastProcessedIndex.current = -1; committedTextRef.current = ''; } catch (e) {} };
-  };
+      if (isFinal) lastCommittedWordCountRef.current = 0;
+    }
+  }, []);
 
   const initVosk = async () => {
     if (voskModelRef.current) return voskModelRef.current;
-    console.log("[VOSK] Loading Local Model...");
     let baseUrl = typeof __XR_ENV_BASE__ !== 'undefined' ? __XR_ENV_BASE__ : '';
     if (baseUrl && !baseUrl.endsWith('/')) baseUrl += '/';
     const modelPath = `${window.location.origin}${baseUrl}vosk-model-small-en-us-0.15.tar.gz`;
     try {
       const model = await vosk.createModel(modelPath);
-      console.log("[VOSK] Model Loaded Successfully");
       voskModelRef.current = model;
       return model;
-    } catch (e) { console.error("[VOSK] Model Load Failed:", e); return null; }
+    } catch (e) { return null; }
   };
 
   useEffect(() => {
-    if (passive) return;
-    const channel = new BroadcastChannel('captions_channel');
-    channel.onmessage = (e) => { if (e.data.type === 'SYNC_REQUEST') broadcastState(); };
-    const handleDirectionUpdate = (data) => { currentAngleRef.current = data.angle; };
-    socket.on('direction_update', handleDirectionUpdate);
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      setupRecognition(recognition);
-      recognitionRef.current = recognition;
+    if (passive) {
+      const handleMessage = (e) => {
+        if (e.data.type === 'SYNC_STATE') {
+          setHistory(e.data.history || []);
+          setIsListening(e.data.isListening || false);
+          setAudioLevels(e.data.audioLevels || {left:0, right:0});
+        } else if (e.data.type === 'CAPTION_BATCH') {
+          if (e.data.history) setHistory(e.data.history);
+        }
+      };
+      broadcastChannelRef.current?.addEventListener('message', handleMessage);
+      broadcastChannelRef.current?.postMessage({ type: 'SYNC_REQUEST' });
+      return () => broadcastChannelRef.current?.removeEventListener('message', handleMessage);
+    } else {
+      const handleSyncRequest = (e) => { if (e.data.type === 'SYNC_REQUEST') broadcastState(); };
+      broadcastChannelRef.current?.addEventListener('message', handleSyncRequest);
+      const handleDirectionUpdate = (data) => { currentAngleRef.current = data.angle; };
+      socket.on('direction_update', handleDirectionUpdate);
+      return () => {
+        socket.off('direction_update', handleDirectionUpdate);
+        broadcastChannelRef.current?.removeEventListener('message', handleSyncRequest);
+      };
     }
-    return () => {
-      socket.off('direction_update', handleDirectionUpdate);
-      if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.abort(); }
-      if (voskRecognizerRef.current) voskRecognizerRef.current.remove();
-      channel.close();
-    };
   }, [passive, broadcastState]);
-
-  const originalGUMs = useRef({});
-  useEffect(() => {
-    if (passive) return;
-    const gums = {};
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) gums.mediaDevices = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    gums.webkit = navigator.webkitGetUserMedia ? navigator.webkitGetUserMedia.bind(navigator) : null;
-    gums.moz = navigator.mozGetUserMedia ? navigator.mozGetUserMedia.bind(navigator) : null;
-    gums.legacy = navigator.getUserMedia ? navigator.getUserMedia.bind(navigator) : null;
-    originalGUMs.current = gums;
-  }, [passive]);
 
   const start = async () => {
     if (passive) return;
-    console.log("[LISTENER] start() called");
+    console.log("[LISTENER] start() - Async Engine Load");
     shouldBeListening.current = true;
-    committedTextRef.current = '';
+    recognizerReadyRef.current = false;
+    lastCommittedWordCountRef.current = 0;
 
-    const isDebug = window.appLanguage === 'Debug Mode';
-    const ac = window.__GLOBAL_AC__ || new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const ac = window.__GLOBAL_AC__; // Guaranteed by App.jsx click stack
     audioContextRef.current = ac;
-    window.__GLOBAL_AC__ = ac; 
     
-    // Disconnect previous session connections
     if (processorRef.current) processorRef.current.disconnect();
-    if (audioSourceNodeRef.current) audioSourceNodeRef.current.disconnect();
-    if (micSourceNodeRef.current) micSourceNodeRef.current.disconnect();
 
     const processor = ac.createScriptProcessor(4096, 1, 1);
     processorRef.current = processor;
     processor.onaudioprocess = (e) => {
+      if (shouldBeListening.current && voskRecognizerRef.current && recognizerReadyRef.current) {
+         try { voskRecognizerRef.current.acceptWaveform(e.inputBuffer); } catch (err) {}
+      }
       const input = e.inputBuffer.getChannelData(0);
-      if (Math.random() > 0.99) { /* Keep-alive activity check */ }
-      if (voskRecognizerRef.current) voskRecognizerRef.current.acceptWaveform(e.inputBuffer);
       let max = 0;
       for (let i = 0; i < input.length; i++) {
         const val = Math.abs(input[i]);
         if (val > max) max = val;
       }
       audioLevelsRef.current = { left: max, right: max };
-      const interleaved = new Int16Array(input.length * 2);
-      for (let i = 0; i < input.length; i++) {
-        interleaved[i*2] = input[i] * 0x7FFF;
-        interleaved[i*2+1] = input[i] * 0x7FFF;
-      }
+      const interleaved = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) interleaved[i] = input[i] * 0x7FFF;
       socket.emit('audio_data', interleaved.buffer);
     };
-
-    if (ac.state === 'suspended') await ac.resume().catch(() => {});
 
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     heartbeatRef.current = setInterval(() => {
       if (shouldBeListening.current && ac.state === 'running') {
         const osc = ac.createOscillator();
-        const g = ac.createGain();
-        g.gain.value = 0.000001;
+        const g = ac.createGain(); g.gain.value = 0.000001;
         osc.connect(g); g.connect(ac.destination);
         osc.start(0); osc.stop(ac.currentTime + 0.1);
       }
     }, 5000);
 
     try {
+      const isDebug = window.appLanguage === 'Debug Mode';
+      let sourceNode;
       if (isDebug) {
-        console.log("[DEBUG] Starting Test Audio Setup...");
-        let baseUrl = typeof __XR_ENV_BASE__ !== 'undefined' ? __XR_ENV_BASE__ : '';
-        if (baseUrl && !baseUrl.endsWith('/')) baseUrl += '/';
-        const audioPath = `${baseUrl}test_recording.m4a`;
-        
-        let debugAudio = debugAudioRef.current;
-        if (!debugAudio) {
-           debugAudio = new Audio();
-           debugAudio.crossOrigin = "anonymous";
-           debugAudio.loop = true;
-           debugAudioRef.current = debugAudio;
-        }
-        
-        await new Promise((resolve) => {
-          const t = setTimeout(resolve, 2000);
-          debugAudio.oncanplaythrough = () => { clearTimeout(t); resolve(); };
-          debugAudio.onerror = resolve;
-          debugAudio.src = audioPath + '?t=' + Date.now();
-        });
-        
-        console.log("[DEBUG] Resuming AC before play...");
-        await ac.resume();
-        await debugAudio.play().catch(e => console.error("[DEBUG] Play failed:", e));
-        
-        // Re-use source node if it exists
-        if (!audioSourceNodeRef.current) {
-           audioSourceNodeRef.current = ac.createMediaElementSource(debugAudio);
-        }
-        
-        audioSourceNodeRef.current.connect(ac.destination); 
-        audioSourceNodeRef.current.connect(processor);
-        processor.connect(ac.destination);
-
-        setIsListening(true);
-        initVosk().then(model => {
-          if (model) {
-            const recognizer = new model.KaldiRecognizer(16000);
-            voskRecognizerRef.current = recognizer;
-            recognizer.on("result", (m) => commitCurrent(m.result.text, 'Live Captions', true));
-            recognizer.on("partialresult", (m) => { if (m.result.partial) commitCurrent(m.result.partial, 'Live Captions', false); });
-            console.log("[VOSK] Recognizer ready");
-          }
-        });
+        sourceNode = window.__DEBUG_SOURCE_NODE__;
+        if (!sourceNode) throw new Error("Debug source node not initialized in click stack");
       } else {
-        const gum = originalGUMs.current.mediaDevices || originalGUMs.current.legacy;
-        const stream = await gum({ audio: { channelCount: 2, echoCancellation: false } });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
         mediaStream.current = stream;
-        
-        if (!micSourceNodeRef.current) {
-           micSourceNodeRef.current = ac.createMediaStreamSource(stream);
-        }
-        
-        micSourceNodeRef.current.connect(processor);
-        processor.connect(ac.destination);
-        
-        setIsListening(true);
-        if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) {}
+        sourceNode = ac.createMediaStreamSource(stream);
       }
-    } catch (e) { console.error("Session start failed:", e); setIsListening(false); }
+
+      // Connect source to processor
+      sourceNode.connect(processor);
+      // Processor connects to destination to ensure sound passes through (important for Debug)
+      processor.connect(ac.destination);
+      
+      setIsListening(true);
+
+      initVosk().then(model => {
+        if (model && shouldBeListening.current) {
+          const recognizer = new model.KaldiRecognizer(16000);
+          recognizer.setWords(true);
+          recognizer.on("result", (m) => commitCurrent(m.result.text, 'Live Captions', true));
+          recognizer.on("partialresult", (m) => { if (m.result.partial) commitCurrent(m.result.partial, 'Live Captions', false); });
+          voskRecognizerRef.current = recognizer;
+          setTimeout(() => { if (shouldBeListening.current) recognizerReadyRef.current = true; }, 50);
+        }
+      });
+    } catch (e) { console.error("[LISTENER] Start Critical Failure:", e); setIsListening(false); }
   };
 
   const stop = () => {
     if (passive) return;
-    console.log("[LISTENER] stop() called");
+    console.log("[LISTENER] stop()");
     shouldBeListening.current = false;
+    recognizerReadyRef.current = false;
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-    if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.abort(); }
     if (voskRecognizerRef.current) { voskRecognizerRef.current.remove(); voskRecognizerRef.current = null; }
-    if (debugAudioRef.current) { debugAudioRef.current.pause(); debugAudioRef.current.src = ""; }
-    if (mediaStream.current && mediaStream.current.getTracks) mediaStream.current.getTracks().forEach(t => t.stop());
-    
-    if (processorRef.current) processorRef.current.disconnect();
-    if (audioSourceNodeRef.current) audioSourceNodeRef.current.disconnect();
-    if (micSourceNodeRef.current) micSourceNodeRef.current.disconnect();
+    if (window.__DEBUG_AUDIO_EL__) window.__DEBUG_AUDIO_EL__.pause();
+    if (mediaStream.current) { mediaStream.current.getTracks().forEach(t => t.stop()); mediaStream.current = null; }
+    if (processorRef.current) { processorRef.current.disconnect(); processorRef.current.onaudioprocess = null; }
+    if (window.__DEBUG_SOURCE_NODE__) window.__DEBUG_SOURCE_NODE__.disconnect();
     if (audioContextRef.current) audioContextRef.current.suspend().catch(() => {});
-    
     setIsListening(false);
-    setInterimText('');
     setHistory([]);
-    const channel = new BroadcastChannel('captions_channel');
-    channel.postMessage({ type: 'SYNC_STATE', isListening: false, history: [], interimText: '' });
-    channel.close();
+    broadcastChannelRef.current?.postMessage({ type: 'CAPTION_BATCH', history: [] });
   };
 
-  return { history, interimText, isListening, audioLevels, start, stop };
+  return { history, isListening, audioLevels, start, stop };
 }

@@ -4,47 +4,11 @@ import { useSpeechRecognition } from '../hooks/listener.jsx';
 import './Subtitles.css';
 
 export default function SpeakerCaption() {
-  const { speakerName } = useParams(); // "Live Captions"
+  const { speakerName } = useParams();
 
   // Speaker windows are ALWAYS passive (engine runs in Main window)
-  const { history: sharedHistory, interimText: sharedInterim } = useSpeechRecognition({ passive: true });
+  const { history, interimText } = useSpeechRecognition({ passive: true });
   
-  const [history, setHistory] = useState([]); 
-  const [interimText, setInterimText] = useState('');
-
-  // Sync internal display state with all incoming captions
-  useEffect(() => {
-    setHistory(sharedHistory.map(h => ({
-       ...h,
-       timestamp: h.timestamp || Date.now(),
-       isExiting: false
-    })));
-  }, [sharedHistory]);
-
-  useEffect(() => {
-    setInterimText(sharedInterim);
-  }, [sharedInterim]);
-
-  // Cleanup effect: Mark items as exiting shortly before final removal
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      setHistory(prev => {
-        let changed = false;
-        const next = prev.map(item => {
-          if (!item.isExiting && (now - item.timestamp) > 6200) {
-            changed = true;
-            return { ...item, isExiting: true };
-          }
-          return item;
-        }).filter(item => (now - item.timestamp) < 7000);
-
-        return (changed || next.length !== prev.length) ? next : prev;
-      });
-    }, 100); 
-    return () => clearInterval(interval);
-  }, []);
-
   useEffect(() => {
     window.focus();
     const channel = new BroadcastChannel('captions_channel');
@@ -70,13 +34,18 @@ export default function SpeakerCaption() {
           <h2 className="speaker-label">Live Captions</h2>
         </div>
         <div className="captions-area">
-          {history.map((line) => (
-            <React.Fragment key={line.id}>
-              <span className={`final-text ${line.isExiting ? 'exiting' : ''}`}>{line.text} </span>
-              {line.isPause && <br />}
-            </React.Fragment>
-          ))}
-          {interimText && <span className="interim-text">{interimText}</span>}
+          <div className="captions-content-inner">
+            {/* History and Interim rendered in one stable list */}
+            {history.map((line) => (
+              <React.Fragment key={line.id}>
+                <span className="final-text">{line.text} </span>
+                {line.isPause && <br />}
+              </React.Fragment>
+            ))}
+            {interimText && interimText.trim() && (
+              <span className="interim-text" key="interim">{interimText}</span>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -9,17 +9,127 @@
 
 @keyframes simpleFade { 0% { opacity: 0; } 100% { opacity: 1; } }
 
-html.is-spatial .speaker-caption-container {
-  background: transparent !important; background-color: transparent !important; backdrop-filter: none !important; box-shadow: none !important;
-  --xr-background-material: translucent; --xr-back: 100; border: 0.5px solid rgba(255, 255, 255, 0.25);
+.speaker-caption-container {
+  width: 90%; 
+  max-width: 720px; 
+  border-radius: 44px; 
+  background: rgba(255, 255, 255, 0.08); 
+  backdrop-filter: blur(40px) saturate(180%); 
+  display: flex; 
+  flex-direction: column; 
+  overflow: hidden;
+  animation: liquidEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
-.speaker-header { padding: 14px 24px; background: rgba(255, 255, 255, 0.04); border-bottom: 0.5px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between; }
-.header-left { display: flex; align-items: center; gap: 14px; }
-.angle-recenter-btn { background: rgba(255, 255, 255, 0.08); border: 0.5px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: white; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1rem; }
-.speaker-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 12px currentColor; }
-.speaker-label { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.8px; color: rgba(255, 255, 255, 0.5); margin: 0; }
+@keyframes liquidEntrance { 
+  0% { opacity: 0; transform: scale(0.95) translateY(20px); } 
+  100% { opacity: 1; transform: scale(1) translateY(0); } 
+}
 
-.captions-area { padding: 24px 30px 35px; font-size: 2.1rem; line-height: 1.3; font-weight: 600; min-height: 120px; display: flex; flex-direction: column; justify-content: flex-start; text-shadow: 0 2px 15px rgba(0, 0, 0, 0.4); }
-.final-text { margin: 10px 0; color: #ffffff; animation: simpleFade 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.interim-text { margin: 10px 0; color: rgba(255, 255, 255, 0.45); font-style: italic; }
+html.is-spatial.is-speaker-page {
+  --xr-background-material: transparent !important;
+}
+
+html.is-spatial .speaker-caption-container {
+  --xr-background-material: translucent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  opacity: 1 !important;
+}
+
+.speaker-header { 
+  padding: 24px 32px 12px; 
+  background: transparent;
+  display: flex; 
+  align-items: center; 
+  gap: 12px;
+}
+
+.live-star-container {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+
+.live-star-core {
+  width: 8px;
+  height: 8px;
+  background: #4dff88;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #4dff88;
+  z-index: 2;
+  animation: corePulse 1.5s ease-in-out infinite;
+}
+
+.live-star-flash {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(77, 255, 136, 0.4);
+  animation: starFlash 1.5s ease-out infinite;
+}
+
+@keyframes corePulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.1); filter: brightness(1.3); }
+}
+
+@keyframes starFlash {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(3.5); opacity: 0; }
+}
+
+.speaker-label { 
+  font-size: 1rem; 
+  font-weight: 700; 
+  text-transform: uppercase; 
+  letter-spacing: 0.2em; 
+  color: rgba(255, 255, 255, 0.9); 
+  margin: 0; 
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+.captions-area { 
+  padding: 12px 36px 48px; 
+  font-size: 2.6rem; 
+  line-height: 1.25; 
+  font-weight: 600; 
+  letter-spacing: -0.015em;
+  min-height: 140px; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: flex-start; 
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.final-text { 
+  margin: 8px 0; 
+  color: rgba(255, 255, 255, 0.96); 
+  animation: textFloat 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); 
+}
+
+.interim-text { 
+  margin: 8px 0; 
+  color: rgba(255, 255, 255, 0.45); 
+  font-style: normal; 
+  filter: blur(0.4px);
+  transition: all 0.3s ease;
+}
+
+@keyframes textFloat {
+  0% { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}

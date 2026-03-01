@@ -63,24 +63,17 @@ export default function SpeakerCaption() {
     }}>
       <div 
         className="speaker-caption-container" 
-        enable-xr="true"
+        enable-xr
         style={{
-          /* 
-             Orbital Gaze-Centric Swing:
-             1. Pivot is 1000px behind (at user's eyes)
-             2. Positive angle from backend rotates Right
-             3. Bubble naturally faces the user during the arc
-          */
-          transformOrigin: `center center -1000px`,
-          transform: `rotateY(${angle}deg) translateZ(100px)`,
           position: 'relative',
-          transition: 'transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)',
-          transformStyle: 'preserve-3d'
         }}
       >
         <div className="speaker-header">
-          <div className="speaker-dot" style={{ backgroundColor: speakerColor }}></div>
-          <h2 className="speaker-label">{speakerName}</h2>
+          <div className="live-star-container">
+            <div className="live-star-core"></div>
+            <div className="live-star-flash"></div>
+          </div>
+          <h2 className="speaker-label">Live Captions</h2>
         </div>
         <div className="captions-area">
           {history.map((line, i) => (

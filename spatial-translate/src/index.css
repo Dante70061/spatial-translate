@@ -17,7 +17,7 @@ body, html {
 }
 
 html.is-spatial, html.is-spatial body {
-  background: transparent !important; background-color: transparent !important; --xr-background-material: transparent !important;
+  background: transparent !important; background-color: transparent !important; --xr-background-material: transparent;
 }
 
 /* --- THE UNIFIED CONTENT SCENE --- */

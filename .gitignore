@@ -59,3 +59,6 @@ Thumbs.db
 # Agents
 GEMINI.md
 webspatial-docs.txt
+
+# Testing data
+spatial-translate/public/test_recording.m4a

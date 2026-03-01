@@ -12,7 +12,7 @@ export default function Navbar({ onReset, isListening }) {
     <nav className={`navbar ${isListening ? 'active' : ''}`} enable-xr="true">
       <div className="navbar-inner">
         <div className="navbar-left">
-          <h2 className="logo">SpatialTranslate</h2>
+          <h2 className="logo">SpatialTranscribe</h2>
         </div>
 
         <div className="navbar-right">

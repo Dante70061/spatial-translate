@@ -46,7 +46,7 @@ export default function Navbar({ onStart, onStop }) {
         </button>
 
         {/* Profile */}
-        <div className="profile-circle">D</div>
+        <div className="profile-circle"></div>
       </div>
     </nav>
   )

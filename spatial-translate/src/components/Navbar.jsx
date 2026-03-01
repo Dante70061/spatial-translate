@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import "./Navbar.css"
 
-export default function Navbar({ onReset }) {
+export default function Navbar({ onReset, isListening }) {
   const [language, setLanguage] = useState("Spanish")
   const location = useLocation()
 
   return (
-    <nav className="navbar" enable-xr="true">
+    /* The 'active' class now handles the subtle downward slide instead of 'hidden' */
+    <nav className={`navbar ${isListening ? 'active' : ''}`} enable-xr="true">
       <div className="navbar-inner">
         <div className="navbar-left">
           <h2 className="logo">SpatialTranslate</h2>

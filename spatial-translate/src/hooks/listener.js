@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-// Use local backend by default for development, fallback to render if needed
 /* global __XR_ENV_BASE__ */
 const SOCKET_URL = 'https://spatial-translate-11.onrender.com';
+console.log("[SOCKET] Attempting connection to:", SOCKET_URL);
 
 const socket = io(SOCKET_URL, {
   path: '/socket.io/',
-  transports: ['websocket', 'polling']
+  transports: ['polling', 'websocket'], // Use polling first for stability, then upgrade
+  reconnectionAttempts: 5,
+  timeout: 10000
 });
 
 export function useSpeechRecognition() {
@@ -24,14 +26,15 @@ export function useSpeechRecognition() {
   const mediaStream = useRef(null);
   const audioContextRef = useRef(null);
 
-  const currentAngleRef = useRef(0);
+  // Synchronization and de-duplication refs
+  const lastProcessedIndex = useRef(-1);
+  const currentInterimRef = useRef('');
+  const isCommitting = useRef(false);
+  const sentenceStartTime = useRef(null);
+  const pauseTimer = useRef(null);
 
   useEffect(() => {
-    const handleDirectionUpdate = (data) => {
-      setCurrentAngle(data.angle);
-      currentAngleRef.current = data.angle;
-    };
-
+    const handleDirectionUpdate = (data) => setCurrentAngle(data.angle);
     socket.on('direction_update', handleDirectionUpdate);
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -42,88 +45,101 @@ export function useSpeechRecognition() {
     recognition.continuous = true; 
     recognition.interimResults = true;
 
-    let silenceTimer;
-    let lastProcessedIndex = -1;
-    let sessionStartTime = Date.now();
-
     const channel = new BroadcastChannel('captions_channel');
-    
-    // Support "late joiners" by responding to sync requests
-    channel.onmessage = (e) => {
-      if (e.data.type === 'SYNC_REQUEST') {
-        console.log("Received SYNC_REQUEST, sending history...");
-        channel.postMessage({ type: 'SYNC_RESPONSE', history: historyRef.current });
-      }
+
+    const commitCurrent = (text, speaker) => {
+      if (!text.trim() || isCommitting.current) return;
+      isCommitting.current = true;
+
+      console.log(`[COMMIT] ${speaker}: ${text}`);
+      
+      const newItem = { text, angle: audioLevelsRef.current.left > audioLevelsRef.current.right ? -10 : 10, speaker };
+      
+      setHistory(prev => {
+        const updated = [...prev, newItem];
+        historyRef.current = updated;
+        return updated;
+      });
+
+      channel.postMessage({ type: 'CAPTION', speaker, text, isFinal: true });
+      
+      // Reset state for next sentence
+      setInterimText('');
+      currentInterimRef.current = '';
+      sentenceStartTime.current = null;
+      if (pauseTimer.current) clearTimeout(pauseTimer.current);
+
+      // Force a hard reset of the engine to clear its buffer entirely
+      try {
+        recognition.abort(); // Use abort for instant stoppage
+      } catch (e) {}
+      
+      // Unlock after a brief delay to allow engine to restart
+      setTimeout(() => {
+        isCommitting.current = false;
+      }, 300);
     };
 
     recognition.onresult = (event) => {
-      if (silenceTimer) clearTimeout(silenceTimer);
+      if (isCommitting.current) return;
 
       let interim = '';
+      let nativeFinal = '';
+      const isLeft = audioLevelsRef.current.left > audioLevelsRef.current.right;
+      const currentSpeaker = isLeft ? 'Person A' : 'Person B';
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
-        const isLeft = audioLevelsRef.current.left > audioLevelsRef.current.right;
-        const currentSpeaker = isLeft ? 'Person A' : 'Person B';
-
         if (event.results[i].isFinal) {
-          if (i > lastProcessedIndex) {
-            if (!transcript.trim()) continue;
-            
-            const newItem = { 
-              text: transcript, 
-              angle: isLeft ? -10 : 10,
-              speaker: currentSpeaker
-            };
-
-            setHistory(prev => {
-              const updated = [...prev, newItem];
-              historyRef.current = updated;
-              return updated;
-            });
-            
-            // Broadcast final text
-            console.log(`Broadcasting FINAL for ${currentSpeaker}: ${transcript}`);
-            channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: transcript, isFinal: true });
-            
-            lastProcessedIndex = i;
+          if (i > lastProcessedIndex.current) {
+            nativeFinal = transcript;
+            lastProcessedIndex.current = i;
           }
         } else {
           interim += transcript;
-          // Broadcast interim text
-          if (interim.trim()) {
-            console.log(`Broadcasting INTERIM for ${currentSpeaker}: ${interim}`);
-            channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: interim, isFinal: false });
-          }
         }
       }
 
-      setInterimText(interim);
-
-      // Force refresh only if the session is getting very long to maintain stability
-      const sessionDuration = Date.now() - sessionStartTime;
-      const shouldRefresh = sessionDuration > 300000; 
-
-      if (interim.trim()) {
-        silenceTimer = setTimeout(() => {
-          recognition.stop(); 
-        }, 5000); 
-      } else if (shouldRefresh) {
-        recognition.stop();
+      // 1. Handle Native Finalization
+      if (nativeFinal) {
+        commitCurrent(nativeFinal, currentSpeaker);
+        return;
       }
-    };
 
-    recognition.onstart = () => {
-      sessionStartTime = Date.now();
-      lastProcessedIndex = -1;
+      // 2. Handle Interim Updates with Persistence
+      if (interim.trim()) {
+        if (!sentenceStartTime.current) sentenceStartTime.current = Date.now();
+        
+        // Persistence Check: Don't let interim text shrink dramatically unless it's a new sentence
+        // This prevents the flickering deletions you were seeing.
+        if (interim.length >= currentInterimRef.current.length || interim.length > (currentInterimRef.current.length * 0.7)) {
+          setInterimText(interim);
+          currentInterimRef.current = interim;
+          channel.postMessage({ type: 'CAPTION', speaker: currentSpeaker, text: interim, isFinal: false });
+        }
+
+        // A. Max Length Watchdog (5s)
+        if (Date.now() - sentenceStartTime.current > 5000) {
+          commitCurrent(currentInterimRef.current, currentSpeaker);
+          return;
+        }
+
+        // B. Pause Watchdog (1.5s)
+        if (pauseTimer.current) clearTimeout(pauseTimer.current);
+        pauseTimer.current = setTimeout(() => {
+          if (currentInterimRef.current) {
+            commitCurrent(currentInterimRef.current, currentSpeaker);
+          }
+        }, 1500);
+      }
     };
 
     recognition.onend = () => {
       if (shouldBeListening.current) {
         try { 
           recognition.start(); 
-        } catch (e) {
-          if (e.name !== 'InvalidStateError') console.error("Recognition start failed:", e);
-        }
+          lastProcessedIndex.current = -1; // Reset indices for new session
+        } catch (e) {}
       }
     };
 
@@ -134,54 +150,34 @@ export function useSpeechRecognition() {
       channel.close();
       if (recognitionRef.current) {
         recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       }
     };
-  }, []); 
+  }, []);
 
   const start = async () => {
     shouldBeListening.current = true;
     setIsListening(true);
-    
-    try {
-      recognitionRef.current?.start();
-    } catch (e) {
-      console.log("Recognition already started");
-    }
+    try { recognitionRef.current?.start(); } catch (e) {}
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { 
-          channelCount: 2, 
-          echoCancellation: false 
-        } 
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 2, echoCancellation: false } });
       mediaStream.current = stream;
-      
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       audioContextRef.current = audioContext;
-      
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-      }
-
       const source = audioContext.createMediaStreamSource(stream);
       const processor = audioContext.createScriptProcessor(4096, 2, 2);
       
       processor.onaudioprocess = (e) => {
         const left = e.inputBuffer.getChannelData(0);
         const right = e.inputBuffer.getChannelData(1);
-        
-        let lMax = 0;
-        let rMax = 0;
+        let lMax = 0, rMax = 0;
         const interleaved = new Int16Array(left.length * 2);
         for (let i = 0; i < left.length; i++) {
           const lVal = Math.max(-1, Math.min(1, left[i]));
           const rVal = Math.max(-1, Math.min(1, right[i]));
-          
           if (Math.abs(lVal) > lMax) lMax = Math.abs(lVal);
           if (Math.abs(rVal) > rMax) rMax = Math.abs(rVal);
-          
           interleaved[i*2] = lVal * 0x7FFF;
           interleaved[i*2+1] = rVal * 0x7FFF;
         }
@@ -190,17 +186,14 @@ export function useSpeechRecognition() {
         audioLevelsRef.current = levels;
         socket.emit('audio_data', interleaved.buffer);
       };
-
       source.connect(processor);
       processor.connect(audioContext.destination);
-    } catch (e) {
-      console.error("Mic/Spatial Capture failed:", e);
-    }
+    } catch (e) { console.error("Mic Capture failed:", e); }
   };
 
   const stop = () => {
     shouldBeListening.current = false;
-    recognitionRef.current?.stop();
+    recognitionRef.current?.abort();
     mediaStream.current?.getTracks().forEach(t => t.stop());
     audioContextRef.current?.close();
     setIsListening(false);

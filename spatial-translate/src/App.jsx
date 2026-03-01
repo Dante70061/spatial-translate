@@ -22,29 +22,22 @@ function App() {
       if (e.data.type === 'WINDOW_STATUS') {
         if (e.data.status === 'open') {
           activeWindowsRef.current.add(e.data.speaker);
-          setIsStarting(false); // First window is open, we are officially active
+          setIsStarting(false);
         } else if (e.data.status === 'closed') {
           activeWindowsRef.current.delete(e.data.speaker);
-          
           if (activeWindowsRef.current.size === 0 && isListening && !isStarting) {
-            console.log("Last window closed, recovering UI...");
             stop();
           }
         }
       }
     };
 
-    // Periodic safety check with a grace period
     const checkInterval = setInterval(() => {
-      // Only check if we are NOT in the middle of starting up
       if (isListening && !isStarting && activeWindowsRef.current.size > 0) {
-        const snapshot = new Set(activeWindowsRef.current);
         activeWindowsRef.current.clear();
         channel.postMessage({ type: 'PING' });
-        
         setTimeout(() => {
           if (activeWindowsRef.current.size === 0 && isListening && !isStarting) {
-            console.log("Heartbeat failed, recovering UI...");
             stop();
           }
         }, 1500);
@@ -98,10 +91,11 @@ function App() {
     openedSpeakers.current.add(speakerName);
     const sceneName = `speaker_${speakerName.replace(/\s+/g, '_')}`;
     
+    // Compact window (3/4 height of previous large window)
     if (typeof initScene === 'function') {
       initScene(sceneName, (prev) => ({
         ...prev,
-        defaultSize: { width: 1000, height: 800 }
+        defaultSize: { width: 850, height: 600 }
       }));
     }
 
@@ -115,7 +109,7 @@ function App() {
 
   return (
     <>
-      {!isSpeakerRoute && <Navbar onReset={stop} />}
+      {!isSpeakerRoute && <Navbar onReset={stop} isListening={isListening} />}
 
       <Routes>
         <Route path="/speaker/:speakerName" element={<SpeakerCaption />} />
@@ -125,7 +119,7 @@ function App() {
             <div className={`home-page ${isListening ? 'collapsed' : ''}`} enable-xr="true">
               {!isListening && (
                 <div className="home-content">
-                  <div style={{ textAlign: "center", marginBottom: "40px" }}>
+                  <div style={{ textAlign: "center", marginBottom: "60px" }}>
                     <h1>Vision Pro Auto-Caption</h1>
                     <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "1.2rem" }}>
                       Experience spatial, person-anchored captions.
@@ -140,7 +134,6 @@ function App() {
                   >
                     Start Spatial Captions
                   </button>
-
                   <div style={{ marginTop: "60px", color: "white", textAlign: "center", opacity: 0.4 }}>
                     <p>Speak to spawn anchored bubbles in your space.</p>
                   </div>

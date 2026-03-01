@@ -19,7 +19,7 @@ export default function SpeakerCaption() {
       const data = event.data;
       if (data.type === 'CAPTION' && data.speaker === speakerName) {
         if (data.isFinal) {
-          setHistory(prev => [...prev, data.text].slice(-5));
+          setHistory(prev => [...prev, data.text].slice(-3));
           setInterimText('');
         } else {
           setInterimText(data.text);

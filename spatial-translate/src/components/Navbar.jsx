@@ -16,7 +16,9 @@ export default function Navbar({ onStart, onStop }) {
   }
 
   return (
-    <nav className="navbar">
+  <nav className="navbar">
+    <div className="navbar-inner">
+
       {/* Left - Logo */}
       <div className="navbar-left">
         <h2 className="logo">SpatialTranslate</h2>
@@ -24,7 +26,6 @@ export default function Navbar({ onStart, onStop }) {
 
       {/* Right - Controls */}
       <div className="navbar-right">
-        {/* Language Selector */}
         <select
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
@@ -37,17 +38,16 @@ export default function Navbar({ onStart, onStop }) {
           <option>Chinese</option>
         </select>
 
-        {/* Start / Stop Button */}
         <button
           className={`control-button ${isRunning ? "stop" : "start"}`}
           onClick={handleToggle}
         >
           {isRunning ? "Stop" : "Start"}
         </button>
-
-        {/* Profile */}
-        <div className="profile-circle"></div>
       </div>
-    </nav>
-  )
+
+    </div>
+  </nav>
+)
+
 }

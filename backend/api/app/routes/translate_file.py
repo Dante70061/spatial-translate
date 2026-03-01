@@ -14,9 +14,7 @@ translate_bp = Blueprint('translate_bp', __name__)
 api_key = os.environ.get("GEMINI_API_KEY")
 
 # Initialize client outside the route for better performance
-client = None
-if api_key:
-    client = genai.Client(api_key=api_key)
+client = genai.Client(api_key=api_key)
 
 @translate_bp.route("/translate-file", methods=["POST"])
 def translate_file():

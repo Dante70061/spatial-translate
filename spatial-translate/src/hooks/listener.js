@@ -8,6 +8,7 @@ export function useSpeechRecognition() {
   const [interimText, setInterimText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
+  const [audioLevels, setAudioLevels] = useState({ left: 0, right: 0 });
   
   const recognitionRef = useRef(null);
   const shouldBeListening = useRef(false);
@@ -32,8 +33,13 @@ export function useSpeechRecognition() {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          // Add finalized sentence to history with the detected angle
-          setHistory(prev => [...prev, { text: transcript, angle: currentAngle }]);
+          // Use the dominant channel for identification
+          const isLeft = audioLevels.left > audioLevels.right;
+          setHistory(prev => [...prev, { 
+            text: transcript, 
+            angle: isLeft ? -10 : 10,
+            speaker: isLeft ? 'Person A' : 'Person B'
+          }]);
         } else {
           interim += transcript;
         }
@@ -86,11 +92,21 @@ export function useSpeechRecognition() {
       processor.onaudioprocess = (e) => {
         const left = e.inputBuffer.getChannelData(0);
         const right = e.inputBuffer.getChannelData(1);
+        
+        let lMax = 0;
+        let rMax = 0;
         const interleaved = new Int16Array(left.length * 2);
         for (let i = 0; i < left.length; i++) {
-          interleaved[i*2] = Math.max(-1, Math.min(1, left[i])) * 0x7FFF;
-          interleaved[i*2+1] = Math.max(-1, Math.min(1, right[i])) * 0x7FFF;
+          const lVal = Math.max(-1, Math.min(1, left[i]));
+          const rVal = Math.max(-1, Math.min(1, right[i]));
+          
+          if (Math.abs(lVal) > lMax) lMax = Math.abs(lVal);
+          if (Math.abs(rVal) > rMax) rMax = Math.abs(rVal);
+          
+          interleaved[i*2] = lVal * 0x7FFF;
+          interleaved[i*2+1] = rVal * 0x7FFF;
         }
+        setAudioLevels({ left: lMax, right: rMax });
         socket.emit('audio_data', interleaved.buffer);
       };
 
@@ -108,7 +124,8 @@ export function useSpeechRecognition() {
     audioContextRef.current?.close();
     setIsListening(false);
     setInterimText('');
+    setAudioLevels({ left: 0, right: 0 });
   };
 
-  return { history, interimText, isListening, start, stop };
+  return { history, interimText, isListening, audioLevels, start, stop };
 }
